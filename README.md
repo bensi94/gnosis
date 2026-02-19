@@ -40,6 +40,15 @@ Navigate slides with **← →** or the Prev/Next buttons. Drag the divider betw
 
 Past reviews are saved locally and shown on the home screen — click any to reload without re-generating.
 
+## Screenshots
+
+<img width="1222" height="1052" alt="image" src="https://github.com/user-attachments/assets/6f45cf71-bbeb-49d3-aefd-62fdb0b554fb" />
+
+<img width="1224" height="1049" alt="image" src="https://github.com/user-attachments/assets/3bafb7f5-8b18-4349-801d-d0cf79519074" />
+
+<img width="1219" height="1050" alt="image" src="https://github.com/user-attachments/assets/686b0b3a-2f11-467b-9b6c-b84c69c50b91" />
+
+
 ## Development
 
 ```bash
