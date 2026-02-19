@@ -8,7 +8,7 @@ mermaid.initialize({
   theme: 'dark',
   securityLevel: 'loose',
   themeVariables: {
-    fontSize: '12px',
+    fontSize: '10px',
     fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
   },
 });
@@ -35,8 +35,8 @@ export function MermaidDiagram({ chart }: Props) {
         // Mermaid sets an inline max-width — remove it so the SVG fills the container
         const svgEl = ref.current.querySelector('svg');
         if (svgEl) {
-          svgEl.style.maxWidth = '';
           svgEl.style.width = '100%';
+          svgEl.style.maxWidth = '800px';
           svgEl.style.height = 'auto';
         }
       }
@@ -48,8 +48,8 @@ export function MermaidDiagram({ chart }: Props) {
   if (error) return null;
 
   return (
-    <div className="max-h-96 overflow-y-auto rounded-md bg-muted/30 p-3">
-      <div ref={ref} className="w-full" />
+    <div className="rounded-md bg-muted/30 p-3">
+      <div ref={ref} />
     </div>
   );
 }
