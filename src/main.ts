@@ -38,23 +38,37 @@ function getTokenPath() {
   return path.join(app.getPath('userData'), 'token.enc');
 }
 
+function getPlainTokenPath() {
+  return getTokenPath() + '.plain';
+}
+
 function loadStoredToken(): string | null {
   try {
-    const enc = fs.readFileSync(getTokenPath());
-    return safeStorage.decryptString(enc);
+    if (safeStorage.isEncryptionAvailable() && fs.existsSync(getTokenPath())) {
+      return safeStorage.decryptString(fs.readFileSync(getTokenPath()));
+    }
+    if (fs.existsSync(getPlainTokenPath())) {
+      return fs.readFileSync(getPlainTokenPath(), 'utf-8').trim();
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
 function persistToken(token: string) {
-  const enc = safeStorage.encryptString(token);
-  fs.writeFileSync(getTokenPath(), enc);
+  if (safeStorage.isEncryptionAvailable()) {
+    fs.writeFileSync(getTokenPath(), safeStorage.encryptString(token));
+  } else {
+    fs.writeFileSync(getPlainTokenPath(), token, 'utf-8');
+  }
 }
 
 function deleteStoredToken() {
   const p = getTokenPath();
   if (fs.existsSync(p)) fs.unlinkSync(p);
+  const plain = getPlainTokenPath();
+  if (fs.existsSync(plain)) fs.unlinkSync(plain);
 }
 
 function getResolvedToken(): string | null {
@@ -65,8 +79,7 @@ function getResolvedToken(): string | null {
 // ── Migration ────────────────────────────────────────────────────
 
 function migrateTokenIfNeeded() {
-  const tokenPath = getTokenPath();
-  if (fs.existsSync(tokenPath)) return; // already migrated
+  if (fs.existsSync(getTokenPath()) || fs.existsSync(getPlainTokenPath())) return; // already migrated
 
   const configPath = path.join(app.getPath('userData'), 'config.json');
   if (!fs.existsSync(configPath)) return;
