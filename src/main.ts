@@ -38,48 +38,42 @@ function getTokenPath() {
   return path.join(app.getPath('userData'), 'token.enc');
 }
 
+function getPlainTokenPath() {
+  return getTokenPath() + '.plain';
+}
+
 function loadStoredToken(): string | null {
   try {
-    const enc = fs.readFileSync(getTokenPath());
-    return safeStorage.decryptString(enc);
+    if (safeStorage.isEncryptionAvailable() && fs.existsSync(getTokenPath())) {
+      return safeStorage.decryptString(fs.readFileSync(getTokenPath()));
+    }
+    if (fs.existsSync(getPlainTokenPath())) {
+      return fs.readFileSync(getPlainTokenPath(), 'utf-8').trim();
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
 function persistToken(token: string) {
-  const enc = safeStorage.encryptString(token);
-  fs.writeFileSync(getTokenPath(), enc);
+  if (safeStorage.isEncryptionAvailable()) {
+    fs.writeFileSync(getTokenPath(), safeStorage.encryptString(token));
+  } else {
+    fs.writeFileSync(getPlainTokenPath(), token, 'utf-8');
+  }
 }
 
 function deleteStoredToken() {
   const p = getTokenPath();
   if (fs.existsSync(p)) fs.unlinkSync(p);
+  const plain = getPlainTokenPath();
+  if (fs.existsSync(plain)) fs.unlinkSync(plain);
 }
 
 function getResolvedToken(): string | null {
   if (cachedToken) return cachedToken;
   return loadStoredToken();
-}
-
-// ── Migration ────────────────────────────────────────────────────
-
-function migrateTokenIfNeeded() {
-  const tokenPath = getTokenPath();
-  if (fs.existsSync(tokenPath)) return; // already migrated
-
-  const configPath = path.join(app.getPath('userData'), 'config.json');
-  if (!fs.existsSync(configPath)) return;
-
-  try {
-    const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    if (cfg.githubToken && typeof cfg.githubToken === 'string') {
-      persistToken(cfg.githubToken);
-      console.log('[main] Migrated PAT from config.json to safeStorage');
-    }
-  } catch {
-    // ignore
-  }
 }
 
 // ── OAuth flow ──────────────────────────────────────────────────
@@ -235,7 +229,6 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  migrateTokenIfNeeded();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
