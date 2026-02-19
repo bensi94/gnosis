@@ -9,7 +9,22 @@ Built with Electron + Vite. No server to start.
 - [Claude Code CLI](https://claude.ai/code) — installed and authenticated (`claude auth`)
 - Node.js 20+
 
-## Setup
+## Install
+
+```bash
+brew tap oddur/gnosis
+brew install --cask gnosis
+```
+
+Or download manually from [GitHub Releases](https://github.com/oddur/gnosis/releases). The app is not code-signed — macOS will block it on first launch. After moving to `/Applications`, run:
+
+```bash
+xattr -cr /Applications/Gnosis.app
+```
+
+On first launch, click **Connect GitHub** to authenticate via OAuth. Alternatively, set `GITHUB_TOKEN` in your environment — it takes precedence over OAuth.
+
+## Development
 
 ```bash
 git clone https://github.com/oddur/gnosis.git
@@ -17,8 +32,6 @@ cd gnosis
 npm install
 npm start
 ```
-
-On first launch, click **Connect GitHub** to authenticate via OAuth. Alternatively, set `GITHUB_TOKEN` in your environment — it takes precedence over OAuth.
 
 ## Usage
 
@@ -33,16 +46,6 @@ The app fetches the PR diff and file contents via the GitHub API, builds a conte
 Navigate with **← →** arrow keys or the Prev/Next buttons. Drag the handle between the narrative and diff panels to resize.
 
 Past reviews are saved automatically and shown on the home screen — click any entry to reload it without re-generating.
-
-## macOS: "app is damaged" warning
-
-The app is not code-signed. macOS Gatekeeper will block apps downloaded from the internet. Run this once after unzipping:
-
-```bash
-xattr -cr /Applications/Gnosis.app
-```
-
-Then double-click to open normally.
 
 ## Build
 
