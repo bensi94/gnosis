@@ -10,6 +10,8 @@ interface Props {
   onReviewReady: (review: ReviewGuide) => void;
 }
 
+type AuthStatus = 'checking' | 'unauthenticated' | 'signing-in' | { login: string };
+
 const riskConfig = {
   low:    { label: 'Low',    className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
   medium: { label: 'Medium', className: 'bg-blue-900 text-blue-200 border-blue-700' },
@@ -29,33 +31,38 @@ function timeAgo(iso: string): string {
 }
 
 export function HomePage({ onReviewReady }: Props) {
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [prUrl, setPrUrl] = useState('');
   const [model, setModel] = useState<'opus' | 'sonnet'>('opus');
   const [instructions, setInstructions] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [githubToken, setGithubToken] = useState('');
-  const [tokenSaved, setTokenSaved] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [history, setHistory] = useState<ReviewHistoryEntry[]>([]);
 
   useEffect(() => {
-    window.electronAPI.getConfig().then((cfg) => {
-      if (cfg.githubToken) {
-        setGithubToken(cfg.githubToken);
-        setTokenSaved(true);
-      } else {
-        setShowSettings(true);
-      }
+    window.electronAPI.getAuthState().then(({ authenticated, login }) => {
+      setAuthStatus(authenticated && login ? { login } : 'unauthenticated');
     });
     window.electronAPI.listReviews().then(setHistory);
   }, []);
 
-  async function handleSaveToken(e: React.FormEvent) {
-    e.preventDefault();
-    await window.electronAPI.saveConfig({ githubToken: githubToken.trim() || null });
-    setTokenSaved(true);
-    setShowSettings(false);
+  async function handleSignIn() {
+    setAuthError(null);
+    setAuthStatus('signing-in');
+    try {
+      await window.electronAPI.startOAuth();
+      const { login } = await window.electronAPI.getAuthState();
+      setAuthStatus(login ? { login } : 'unauthenticated');
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Sign-in failed.');
+      setAuthStatus('unauthenticated');
+    }
+  }
+
+  async function handleSignOut() {
+    await window.electronAPI.signOut();
+    setAuthStatus('unauthenticated');
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -71,7 +78,6 @@ export function HomePage({ onReviewReady }: Props) {
         model,
         instructions: instructions.trim() || undefined,
       });
-      // Refresh history in the background
       window.electronAPI.listReviews().then(setHistory);
       onReviewReady(review);
     } catch (err) {
@@ -101,6 +107,8 @@ export function HomePage({ onReviewReady }: Props) {
     return <LoadingScreen message="Analyzing your PR with Claude... This takes 30–60 seconds for large PRs." />;
   }
 
+  const isAuthenticated = typeof authStatus === 'object';
+
   return (
     <main className="flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-lg flex flex-col gap-8">
@@ -111,44 +119,57 @@ export function HomePage({ onReviewReady }: Props) {
           </p>
         </div>
 
-        {/* GitHub token settings */}
-        {showSettings ? (
-          <Card>
-            <CardContent className="pt-6">
-              <form onSubmit={handleSaveToken} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="github-token" className="text-sm font-medium">
-                    GitHub Token
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    Create a token at github.com/settings/tokens with{' '}
-                    <code className="font-mono bg-muted/70 rounded px-1">repo</code> read access.
-                  </p>
-                  <input
-                    id="github-token"
-                    type="password"
-                    placeholder="ghp_..."
-                    value={githubToken}
-                    onChange={(e) => setGithubToken(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  />
-                </div>
-                <Button type="submit">Save Token</Button>
-              </form>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="flex justify-end">
+        {/* Auth section */}
+        {authStatus === 'checking' && (
+          <div className="flex justify-center">
+            <span className="text-sm text-muted-foreground animate-pulse">Loading…</span>
+          </div>
+        )}
+
+        {authStatus === 'unauthenticated' && (
+          <>
+            {authError && (
+              <Alert variant="destructive">
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+            )}
+            <Card>
+              <CardContent className="pt-6 flex flex-col gap-3 items-center text-center">
+                <p className="text-sm text-muted-foreground">
+                  Sign in with GitHub to generate PR reviews.
+                </p>
+                <Button onClick={handleSignIn} className="w-full">
+                  Sign in with GitHub
+                </Button>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {authStatus === 'signing-in' && (
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="text-sm text-muted-foreground animate-pulse">
+              Waiting for GitHub… complete sign-in in your browser.
+            </span>
+          </div>
+        )}
+
+        {isAuthenticated && (
+          <div className="flex justify-end items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              ✓ Signed in as @{(authStatus as { login: string }).login}
+            </span>
             <button
-              onClick={() => setShowSettings(true)}
+              onClick={handleSignOut}
               className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
             >
-              {tokenSaved ? '✓ GitHub token saved · change' : 'Set GitHub token'}
+              Sign out
             </button>
           </div>
         )}
 
-        {!showSettings && (
+        {/* PR form — only shown when authenticated */}
+        {isAuthenticated && (
           <Card>
             <CardContent className="pt-6">
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
