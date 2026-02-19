@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { spawn } from 'child_process';
 import type { ReviewGuide } from './types';
 
 const SYSTEM_PROMPT = `You are an expert code reviewer helping a developer understand a pull request before they review it. Your job is to analyze the PR and produce a guided review — a sequence of "slides" that walks the reviewer through the changes in the best possible order.
@@ -106,6 +106,50 @@ const MODEL_IDS = {
   sonnet: 'claude-sonnet-4-6',
 } as const;
 
+function callClaudeCLI(
+  userContent: string,
+  systemPrompt: string,
+  model: string,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const env = { ...process.env };
+    delete env.CLAUDECODE;
+
+    const proc = spawn('claude', [
+      '-p',
+      '--model', model,
+      '--system-prompt', systemPrompt,
+      '--tools', '',
+      '--output-format', 'text',
+      '--no-session-persistence',
+    ], { env });
+
+    proc.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'ENOENT') {
+        reject(new Error('Claude Code CLI not found. Install it from claude.ai/code and authenticate with `claude auth`.'));
+      } else {
+        reject(err);
+      }
+    });
+
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    proc.stdin.write(userContent);
+    proc.stdin.end();
+
+    proc.on('close', (code: number | null) => {
+      if (code === 0) {
+        resolve(stdout.trim());
+      } else {
+        reject(new Error(`Claude CLI exited with code ${code}: ${stderr.slice(0, 300)}`));
+      }
+    });
+  });
+}
+
 function extractJson(text: string): string {
   // Try to strip markdown code fences if present
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]+?)\s*```/);
@@ -134,47 +178,24 @@ export async function generateReviewGuide(
   model: 'opus' | 'sonnet' = 'opus',
   instructions?: string,
 ): Promise<ReviewGuide> {
-  const client = new Anthropic();
   const modelId = MODEL_IDS[model];
 
   async function attempt(extraInstruction: string = ''): Promise<{ guide: ReviewGuide; truncated: boolean }> {
     const userMessage = contextPackage + USER_SUFFIX + extraInstruction;
 
-    let fullText = '';
-
     const system = instructions?.trim()
       ? `${SYSTEM_PROMPT}\n\nREVIEWER INSTRUCTIONS: ${instructions.trim()}`
       : SYSTEM_PROMPT;
 
-    const stream = client.messages.stream({
-      model: modelId,
-      max_tokens: 32768,
-      system,
-      messages: [{ role: 'user', content: userMessage }],
-    });
-
-    for await (const chunk of stream) {
-      if (
-        chunk.type === 'content_block_delta' &&
-        chunk.delta.type === 'text_delta'
-      ) {
-        fullText += chunk.delta.text;
-        process.stdout.write('.');
-      }
-    }
-    console.log('\n[agent] Generation complete, parsing response...');
-
-    const finalMessage = await stream.finalMessage();
-    const truncated = finalMessage.stop_reason === 'max_tokens';
+    console.log('[agent] Calling Claude CLI...');
+    const fullText = await callClaudeCLI(userMessage, system, modelId);
+    console.log('[agent] Generation complete, parsing response...');
 
     const jsonText = extractJson(fullText);
     let parsed: unknown;
     try {
       parsed = JSON.parse(jsonText);
     } catch (err) {
-      if (truncated) {
-        throw new Error('truncated');
-      }
       throw new Error(`JSON parse failed: ${err instanceof Error ? err.message : String(err)}`);
     }
 
@@ -183,7 +204,7 @@ export async function generateReviewGuide(
     }
 
     (parsed as ReviewGuide).prUrl = prUrl;
-    return { guide: parsed as ReviewGuide, truncated };
+    return { guide: parsed as ReviewGuide, truncated: false };
   }
 
   // First attempt

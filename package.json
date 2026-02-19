@@ -9,7 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.77.0",
     "@octokit/rest": "^22.0.1",
     "@shikijs/transformers": "^3.22.0",
     "class-variance-authority": "^0.7.1",
