@@ -76,7 +76,7 @@ function persistToken(token: string) {
   if (safeStorage.isEncryptionAvailable()) {
     fs.writeFileSync(getTokenPath(), safeStorage.encryptString(token));
   } else {
-    fs.writeFileSync(getPlainTokenPath(), token, 'utf-8');
+    fs.writeFileSync(getPlainTokenPath(), token, { encoding: 'utf-8', mode: 0o600 });
   }
 }
 
