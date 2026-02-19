@@ -66,7 +66,7 @@ jobs:
           ZIP="Gnosis-darwin-arm64-${VERSION}.zip"
           curl -sL "https://github.com/oddur/gnosis/releases/download/${GITHUB_REF_NAME}/${ZIP}" -o /tmp/gnosis.zip
           SHA=$(shasum -a 256 /tmp/gnosis.zip | awk '{print $1}')
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/oddur/homebrew-tap.git" /tmp/homebrew-tap
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/oddur/homebrew-gnosis.git" /tmp/homebrew-tap
           sed -i '' "s/version \".*\"/version \"${VERSION}\"/" /tmp/homebrew-tap/Casks/gnosis.rb
           sed -i '' "s/sha256 \".*\"/sha256 \"${SHA}\"/" /tmp/homebrew-tap/Casks/gnosis.rb
           cd /tmp/homebrew-tap
