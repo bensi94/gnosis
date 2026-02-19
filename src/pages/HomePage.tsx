@@ -105,7 +105,7 @@ export function HomePage({ onReviewReady }: Props) {
     <main className="flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-lg flex flex-col gap-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">PR Review Guide</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Gnosis</h1>
           <p className="mt-2 text-muted-foreground">
             AI-guided code review. Understand the story before you read the diff.
           </p>
