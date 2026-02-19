@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PR Review Guide
 
-## Getting Started
+AI-guided code review. Paste a GitHub PR URL and get a slide-based walkthrough of the changes in dependency order, with narrative explanations for each group.
 
-First, run the development server:
+## Setup
 
 ```bash
+# Install dependencies (already done if you cloned this)
+npm install
+
+# Configure environment
+cp .env.example .env.local
+# Edit .env.local and add your GITHUB_TOKEN and ANTHROPIC_API_KEY
+
+# Run
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Required | Description |
+|---|---|---|
+| `GITHUB_TOKEN` | Yes | GitHub personal access token with `repo` scope |
+| `ANTHROPIC_API_KEY` | Yes | Anthropic API key |
+| `ANTHROPIC_MODEL` | No | Set to `sonnet` to use claude-sonnet-4-6 instead of the default claude-opus-4-6 |
 
-## Learn More
+## How it works
 
-To learn more about Next.js, take a look at the following resources:
+1. Paste a GitHub PR URL on the home page
+2. The app fetches the PR diff, changed files, and surrounding codebase context via the GitHub API
+3. Claude analyzes the changes and produces a structured review: ordered slides grouped by logical dependency
+4. Navigate slides with Prev/Next buttons or arrow keys
+5. Each slide shows: type, title, narrative (why it changed), what to check, and syntax-highlighted diffs
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## From scratch setup
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# Create project
+npx create-next-app@latest pr-review-guide --typescript --tailwind --app
 
-## Deploy on Vercel
+# Install shadcn (select dark theme, zinc color when prompted)
+npx shadcn@latest init
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Add required shadcn components
+npx shadcn@latest add button card badge separator progress skeleton alert tooltip
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Install other deps
+npm install @octokit/rest @anthropic-ai/sdk shiki
+
+# Configure
+cp .env.example .env.local
+# Add GITHUB_TOKEN and ANTHROPIC_API_KEY to .env.local
+
+# Run
+npm run dev
+```
