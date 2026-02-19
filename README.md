@@ -33,6 +33,16 @@ Navigate with **← →** arrow keys or the Prev/Next buttons. Drag the handle b
 
 Past reviews are saved automatically and shown on the home screen — click any entry to reload it without re-generating.
 
+## macOS: "app is damaged" warning
+
+The app is not code-signed. macOS Gatekeeper will block apps downloaded from the internet. Run this once after unzipping:
+
+```bash
+xattr -cr /Applications/Gnosis.app
+```
+
+Then double-click to open normally.
+
 ## GitHub Token
 
 Create a token at [github.com/settings/tokens](https://github.com/settings/tokens) with `repo` read access (or `public_repo` if you only review public repositories).
