@@ -42,6 +42,15 @@ export interface ReviewGuide {
   slides: Slide[];
 }
 
+export interface ReviewHistoryEntry {
+  id: string;
+  prTitle: string;
+  prUrl: string;
+  author: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  savedAt: string; // ISO date string
+}
+
 export interface GenerateReviewRequest {
   prUrl: string;
   model: 'opus' | 'sonnet';
