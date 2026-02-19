@@ -76,25 +76,6 @@ function getResolvedToken(): string | null {
   return loadStoredToken();
 }
 
-// ── Migration ────────────────────────────────────────────────────
-
-function migrateTokenIfNeeded() {
-  if (fs.existsSync(getTokenPath()) || fs.existsSync(getPlainTokenPath())) return; // already migrated
-
-  const configPath = path.join(app.getPath('userData'), 'config.json');
-  if (!fs.existsSync(configPath)) return;
-
-  try {
-    const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    if (cfg.githubToken && typeof cfg.githubToken === 'string') {
-      persistToken(cfg.githubToken);
-      console.log('[main] Migrated PAT from config.json to safeStorage');
-    }
-  } catch {
-    // ignore
-  }
-}
-
 // ── OAuth flow ──────────────────────────────────────────────────
 
 async function exchangeCodeForToken(code: string, codeVerifier: string, redirectUri: string): Promise<string> {
@@ -248,7 +229,6 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  migrateTokenIfNeeded();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
