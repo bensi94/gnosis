@@ -11,6 +11,7 @@ import type { ReviewGuide } from '@/lib/types';
 export default function HomePage() {
   const router = useRouter();
   const [prUrl, setPrUrl] = useState('');
+  const [model, setModel] = useState<'opus' | 'sonnet'>('opus');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +26,7 @@ export default function HomePage() {
       const res = await fetch('/api/generate-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prUrl: prUrl.trim() }),
+        body: JSON.stringify({ prUrl: prUrl.trim(), model }),
       });
 
       const data = await res.json();
@@ -75,6 +76,29 @@ export default function HomePage() {
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   required
                 />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Model</label>
+                <div className="flex gap-2">
+                  {(['opus', 'sonnet'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setModel(m)}
+                      className={`flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                        model === m
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                      }`}
+                    >
+                      {m === 'opus' ? 'Opus 4.6' : 'Sonnet 4.6'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {model === 'opus' ? 'Best quality · slower' : 'Faster · lower cost'}
+                </p>
               </div>
 
               {error && (

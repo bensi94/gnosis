@@ -44,6 +44,7 @@ export interface ReviewGuide {
 
 export interface GenerateReviewRequest {
   prUrl: string;
+  model: 'opus' | 'sonnet';
 }
 
 export interface GenerateReviewResponse {

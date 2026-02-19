@@ -101,12 +101,10 @@ The JSON must match this schema exactly:
   ]
 }`;
 
-function getModelId(): string {
-  if (process.env.ANTHROPIC_MODEL === 'sonnet') {
-    return 'claude-sonnet-4-6';
-  }
-  return 'claude-opus-4-6';
-}
+const MODEL_IDS = {
+  opus:   'claude-opus-4-6',
+  sonnet: 'claude-sonnet-4-6',
+} as const;
 
 function extractJson(text: string): string {
   // Try to strip markdown code fences if present
@@ -130,9 +128,13 @@ const CONCISE_SUFFIX = `
 
 IMPORTANT: Be concise. Keep narrative and reviewFocus under 2 sentences each. Omit contextSnippets entirely (use empty arrays). Limit diffHunks to the 3 most important hunks per slide. Return only raw JSON starting with { and ending with }.`;
 
-export async function generateReviewGuide(contextPackage: string, prUrl: string): Promise<ReviewGuide> {
+export async function generateReviewGuide(
+  contextPackage: string,
+  prUrl: string,
+  model: 'opus' | 'sonnet' = 'opus',
+): Promise<ReviewGuide> {
   const client = new Anthropic();
-  const model = getModelId();
+  const modelId = MODEL_IDS[model];
 
   async function attempt(extraInstruction: string = ''): Promise<{ guide: ReviewGuide; truncated: boolean }> {
     const userMessage = contextPackage + USER_SUFFIX + extraInstruction;
@@ -140,7 +142,7 @@ export async function generateReviewGuide(contextPackage: string, prUrl: string)
     let fullText = '';
 
     const stream = client.messages.stream({
-      model,
+      model: modelId,
       max_tokens: 32768,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
