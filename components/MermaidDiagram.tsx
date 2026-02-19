@@ -44,9 +44,8 @@ export function MermaidDiagram({ chart }: Props) {
   if (error) return null;
 
   return (
-    <div
-      ref={ref}
-      className="w-full rounded-md bg-muted/30 p-3"
-    />
+    <div className="max-h-96 overflow-y-auto rounded-md bg-muted/30 p-3">
+      <div ref={ref} className="w-full" />
+    </div>
   );
 }
