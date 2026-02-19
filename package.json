@@ -1,7 +1,7 @@
 {
   "name": "gnosis",
   "productName": "Gnosis",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "AI-guided code review. Understand the story before you read the diff.",
   "private": true,
   "main": ".vite/build/main.js",
