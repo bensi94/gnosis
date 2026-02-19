@@ -1,6 +1,8 @@
 'use client';
 
+import { MessageSquarePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   Tooltip,
@@ -13,9 +15,11 @@ interface Props {
   total: number;
   onPrev: () => void;
   onNext: () => void;
+  commentCount?: number;
+  onSubmitReview?: () => void;
 }
 
-export function SlideNav({ current, total, onPrev, onNext }: Props) {
+export function SlideNav({ current, total, onPrev, onNext, commentCount = 0, onSubmitReview }: Props) {
   const isOverview = current === 0;
   const progress = isOverview ? 0 : total > 1 ? ((current - 1) / (total - 1)) * 100 : 100;
 
@@ -41,19 +45,37 @@ export function SlideNav({ current, total, onPrev, onNext }: Props) {
           {isOverview ? 'Overview' : `Slide ${current} of ${total}`}
         </span>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
+        <div className="flex items-center gap-2">
+          {onSubmitReview && (
             <Button
               variant="outline"
-              onClick={onNext}
-              disabled={current >= total}
               size="sm"
+              onClick={onSubmitReview}
+              className="gap-1.5"
             >
-              Next →
+              <MessageSquarePlus className="h-3.5 w-3.5" />
+              Submit review
+              {commentCount > 0 && (
+                <Badge variant="secondary" className="ml-0.5 h-5 min-w-[20px] px-1.5 text-xs">
+                  {commentCount}
+                </Badge>
+              )}
             </Button>
-          </TooltipTrigger>
-          <TooltipContent>Next slide (→)</TooltipContent>
-        </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={onNext}
+                disabled={current >= total}
+                size="sm"
+              >
+                Next →
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Next slide (→)</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
     </div>
   );

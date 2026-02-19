@@ -197,3 +197,22 @@
   content: '-';
   color: #f85149;
 }
+
+/* ─── Interactive diff lines ─────────────────────────────────── */
+
+/* Override the default gutter for interactive lines since we render our own */
+.has-diff .line.interactive-line::before {
+  display: none;
+}
+
+.line.interactive-line:hover .add-comment-icon {
+  opacity: 1 !important;
+}
+
+.line.interactive-line:hover .line-number-gutter {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.line.interactive-line {
+  padding-left: 0 !important;
+}

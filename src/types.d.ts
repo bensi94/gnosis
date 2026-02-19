@@ -1,4 +1,4 @@
-import type { GenerateReviewRequest, ReviewGuide, ReviewHistoryEntry } from '../lib/types';
+import type { GenerateReviewRequest, ReviewGuide, ReviewHistoryEntry, SubmitReviewRequest } from '../lib/types';
 
 declare global {
   interface Window {
@@ -13,6 +13,7 @@ declare global {
       deleteReview: (id: string) => Promise<void>;
       onReviewProgress: (callback: (chunk: string, isThinking: boolean) => void) => void;
       offReviewProgress: () => void;
+      submitReview: (req: SubmitReviewRequest) => Promise<{ reviewUrl: string; droppedCommentCount: number }>;
     };
   }
 }

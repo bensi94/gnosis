@@ -40,6 +40,29 @@ export interface ReviewGuide {
   totalFilesChanged: number;
   totalLinesChanged: number;
   slides: Slide[];
+  headSha?: string;
+}
+
+export type DiffSide = 'LEFT' | 'RIGHT';
+export type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
+
+export interface PendingReviewComment {
+  id: string;
+  filePath: string;
+  line: number;
+  side: DiffSide;
+  body: string;
+  hunkHeader: string;
+  codeSnippet: string;
+  slideIndex: number;
+}
+
+export interface SubmitReviewRequest {
+  prUrl: string;
+  headSha: string;
+  event: ReviewEvent;
+  body: string;
+  comments: { path: string; line: number; side: DiffSide; body: string }[];
 }
 
 export interface ReviewHistoryEntry {

@@ -4,14 +4,31 @@ import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'reac
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DiffHunkGroup } from '@/components/DiffHunk';
+import { InteractiveDiffHunkGroup } from '@/components/InteractiveDiffHunk';
 import { Markdown } from '@/components/Markdown';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
-import type { Slide, SlideType, DiffHunk } from '@/lib/types';
+import type { Slide, SlideType, DiffHunk, PendingReviewComment, DiffSide } from '@/lib/types';
+
+interface CommentCallbacks {
+  onAddComment: (params: {
+    filePath: string;
+    line: number;
+    side: DiffSide;
+    body: string;
+    hunkHeader: string;
+    codeSnippet: string;
+    slideIndex: number;
+  }) => void;
+  onRemoveComment: (id: string) => void;
+  onEditComment: (id: string, body: string) => void;
+}
 
 interface Props {
   slide: Slide;
   slideNumber: number;
   totalSlides: number;
+  pendingComments?: PendingReviewComment[];
+  commentCallbacks?: CommentCallbacks;
 }
 
 const slideTypeConfig: Record<SlideType, { label: string; className: string }> = {
@@ -34,7 +51,7 @@ function groupHunksByFile(hunks: DiffHunk[]): { filePath: string; hunks: DiffHun
   return Array.from(map.entries()).map(([filePath, hunks]) => ({ filePath, hunks }));
 }
 
-export function SlideView({ slide }: Props) {
+export function SlideView({ slide, slideNumber, pendingComments, commentCallbacks }: Props) {
   const typeConfig = slideTypeConfig[slide.slideType] ?? slideTypeConfig.feature;
   const groupedHunks = groupHunksByFile(slide.diffHunks);
 
@@ -119,9 +136,22 @@ export function SlideView({ slide }: Props) {
         {groupedHunks.length === 0 && (
           <p className="text-sm text-muted-foreground italic">No diff hunks for this slide.</p>
         )}
-        {groupedHunks.map(({ filePath, hunks }) => (
-          <DiffHunkGroup key={filePath} filePath={filePath} hunks={hunks} />
-        ))}
+        {groupedHunks.map(({ filePath, hunks }) =>
+          commentCallbacks ? (
+            <InteractiveDiffHunkGroup
+              key={filePath}
+              filePath={filePath}
+              hunks={hunks}
+              pendingComments={pendingComments ?? []}
+              slideIndex={slideNumber}
+              onAddComment={commentCallbacks.onAddComment}
+              onRemoveComment={commentCallbacks.onRemoveComment}
+              onEditComment={commentCallbacks.onEditComment}
+            />
+          ) : (
+            <DiffHunkGroup key={filePath} filePath={filePath} hunks={hunks} />
+          ),
+        )}
         </div>
       </Panel>
     </PanelGroup>
