@@ -18,9 +18,7 @@ jobs:
       matrix:
         os:
           - macos-latest   # arm64 (Apple Silicon)
-          - macos-13       # x64  (Intel)
           - windows-latest # x64
-          - ubuntu-latest  # x64
 
     steps:
       - uses: actions/checkout@v4
