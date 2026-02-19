@@ -25,7 +25,7 @@ export function PRSummaryBanner({ review }: Props) {
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-lg font-semibold truncate">{review.prTitle}</h1>
+                <h1 className="text-base font-semibold truncate">{review.prTitle}</h1>
                 <Badge variant={risk.variant}>{risk.label}</Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">

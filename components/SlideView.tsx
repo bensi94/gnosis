@@ -1,5 +1,6 @@
 'use client';
 
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DiffHunkGroup } from '@/components/DiffHunk';
@@ -23,6 +24,13 @@ const slideTypeConfig: Record<SlideType, { label: string; className: string }> =
   docs:       { label: 'Docs',       className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
 };
 
+// Split "1) foo 2) bar 3) baz" into ["foo", "bar", "baz"]
+function splitReviewFocus(text: string): string[] {
+  const parts = text.split(/\s*\d+\)\s+/);
+  // First element is empty string if text starts with "1) "
+  return parts.filter(Boolean);
+}
+
 // Group hunks by filePath so we can render them under a single file header
 function groupHunksByFile(hunks: DiffHunk[]): { filePath: string; hunks: DiffHunk[] }[] {
   const map = new Map<string, DiffHunk[]>();
@@ -38,9 +46,9 @@ export function SlideView({ slide }: Props) {
   const groupedHunks = groupHunksByFile(slide.diffHunks);
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <PanelGroup orientation="horizontal" className="flex flex-1 overflow-hidden">
       {/* Left panel — narrative */}
-      <div className="w-2/5 overflow-y-auto border-r min-h-0">
+      <Panel defaultSize={40} minSize={25} className="overflow-y-auto min-h-0">
         <div className="p-6 flex flex-col gap-5">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge
@@ -51,19 +59,26 @@ export function SlideView({ slide }: Props) {
           </Badge>
         </div>
 
-        <h2 className="text-xl font-semibold leading-tight">{slide.title}</h2>
+        <h2 className="text-lg font-semibold leading-tight">{slide.title}</h2>
 
         <p className="text-sm text-muted-foreground leading-relaxed"><InlineCode text={slide.narrative} /></p>
 
         {/* Review focus */}
-        <Card className="border-2">
+        <Card className="border">
           <CardHeader className="pb-2 pt-3 px-4">
             <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
               What to check
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-3 px-4">
-            <p className="text-sm"><InlineCode text={slide.reviewFocus} /></p>
+            <ul className="space-y-1.5">
+              {splitReviewFocus(slide.reviewFocus).map((point, i) => (
+                <li key={i} className="flex gap-2 text-sm">
+                  <span className="text-muted-foreground shrink-0 mt-px">•</span>
+                  <span><InlineCode text={point} /></span>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
 
@@ -104,10 +119,12 @@ export function SlideView({ slide }: Props) {
           </details>
         )}
         </div>
-      </div>
+      </Panel>
+
+      <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
 
       {/* Right panel — diagram + diffs */}
-      <div className="w-3/5 overflow-y-auto min-h-0">
+      <Panel defaultSize={60} minSize={30} className="overflow-y-auto min-h-0">
         <div className="p-6 flex flex-col gap-4">
         {slide.mermaidDiagram && (
           <div>
@@ -122,7 +139,7 @@ export function SlideView({ slide }: Props) {
           <DiffHunkGroup key={filePath} filePath={filePath} hunks={hunks} />
         ))}
         </div>
-      </div>
-    </div>
+      </Panel>
+    </PanelGroup>
   );
 }

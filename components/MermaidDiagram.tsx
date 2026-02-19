@@ -7,6 +7,10 @@ mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',
   securityLevel: 'loose',
+  themeVariables: {
+    fontSize: '12px',
+    fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+  },
 });
 
 let idCounter = 0;
