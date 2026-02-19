@@ -16,7 +16,11 @@ brew tap oddur/gnosis
 brew install --cask gnosis
 ```
 
-Or download manually from [GitHub Releases](https://github.com/oddur/gnosis/releases). If downloaded manually, run `xattr -cr /Applications/Gnosis.app` once to bypass Gatekeeper.
+Or download manually from [GitHub Releases](https://github.com/oddur/gnosis/releases). The app is not code-signed — macOS will block it on first launch. After moving to `/Applications`, run:
+
+```bash
+xattr -cr /Applications/Gnosis.app
+```
 
 On first launch, click **Connect GitHub** to authenticate via OAuth. Alternatively, set `GITHUB_TOKEN` in your environment — it takes precedence over OAuth.
 
