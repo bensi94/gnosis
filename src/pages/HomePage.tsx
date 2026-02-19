@@ -203,6 +203,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     setIsThinkingPhase(false);
     setLoading(true);
 
+    window.electronAPI.offReviewProgress();
     window.electronAPI.onReviewProgress((chunk, isThinking) => {
       if (isThinking) {
         setIsThinkingPhase(true);
