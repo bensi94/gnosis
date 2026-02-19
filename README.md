@@ -1,58 +1,44 @@
-# PR Review Guide
+# Gnosis
 
-AI-guided code review. Paste a GitHub PR URL and get a slide-based walkthrough of the changes in dependency order, with narrative explanations for each group.
+AI-guided code review. Paste a GitHub PR URL and get a slide-based walkthrough of the changes — ordered by dependency, with narrative explanations, syntax-highlighted diffs, and optional diagrams.
+
+Built with Electron + Vite. No server to start.
+
+## Requirements
+
+- [Claude Code CLI](https://claude.ai/code) — installed and authenticated (`claude auth`)
+- Node.js 20+
 
 ## Setup
 
 ```bash
-# Install dependencies (already done if you cloned this)
+git clone https://github.com/oddur/gnosis.git
+cd gnosis
 npm install
-
-# Configure environment
-cp .env.example .env.local
-# Edit .env.local and add your GITHUB_TOKEN and ANTHROPIC_API_KEY
-
-# Run
-npm run dev
+npm start
 ```
 
-Open http://localhost:3000
+On first launch, enter your GitHub personal access token in the settings field. It's stored locally in your OS user data directory. Alternatively, set `GITHUB_TOKEN` in your environment — it takes precedence.
 
-## Environment Variables
+## Usage
 
-| Variable | Required | Description |
-|---|---|---|
-| `GITHUB_TOKEN` | Yes | GitHub personal access token with `repo` scope |
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key |
-| `ANTHROPIC_MODEL` | No | Set to `sonnet` to use claude-sonnet-4-6 instead of the default claude-opus-4-6 |
+1. Paste a GitHub PR URL
+2. Pick a model (Opus 4.6 for best quality, Sonnet 4.6 for speed)
+3. Optionally add reviewer instructions — e.g. *focus on security*, *explain the auth flow*
+4. Hit **Generate Review**
 
-## How it works
+The app fetches the PR diff and file contents via the GitHub API, builds a context package, and sends it to Claude via the Claude CLI. Claude returns an ordered set of slides grouped by logical dependency.
 
-1. Paste a GitHub PR URL on the home page
-2. The app fetches the PR diff, changed files, and surrounding codebase context via the GitHub API
-3. Claude analyzes the changes and produces a structured review: ordered slides grouped by logical dependency
-4. Navigate slides with Prev/Next buttons or arrow keys
-5. Each slide shows: type, title, narrative (why it changed), what to check, and syntax-highlighted diffs
+Navigate with **← →** arrow keys or the Prev/Next buttons. Drag the handle between the narrative and diff panels to resize.
 
-## From scratch setup
+Past reviews are saved automatically and shown on the home screen — click any entry to reload it without re-generating.
+
+## GitHub Token
+
+Create a token at [github.com/settings/tokens](https://github.com/settings/tokens) with `repo` read access (or `public_repo` if you only review public repositories).
+
+## Build
 
 ```bash
-# Create project
-npx create-next-app@latest pr-review-guide --typescript --tailwind --app
-
-# Install shadcn (select dark theme, zinc color when prompted)
-npx shadcn@latest init
-
-# Add required shadcn components
-npx shadcn@latest add button card badge separator progress skeleton alert tooltip
-
-# Install other deps
-npm install @octokit/rest @anthropic-ai/sdk shiki
-
-# Configure
-cp .env.example .env.local
-# Add GITHUB_TOKEN and ANTHROPIC_API_KEY to .env.local
-
-# Run
-npm run dev
+npm run make      # produces a distributable in out/
 ```
