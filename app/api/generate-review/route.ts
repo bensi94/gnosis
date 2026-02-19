@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { prUrl, model = 'opus' } = body;
+  const { prUrl, model = 'opus', instructions } = body;
 
   if (!prUrl || !isValidGithubPrUrl(prUrl)) {
     return NextResponse.json(
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     // Generate review with AI
     console.log('[api] Generating review guide...');
-    const reviewGuide = await generateReviewGuide(contextPackage, prUrl, model);
+    const reviewGuide = await generateReviewGuide(contextPackage, prUrl, model, instructions);
 
     // Fill in metadata that the agent might not have accurate values for
     reviewGuide.prTitle = reviewGuide.prTitle || prData.title;

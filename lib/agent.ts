@@ -132,6 +132,7 @@ export async function generateReviewGuide(
   contextPackage: string,
   prUrl: string,
   model: 'opus' | 'sonnet' = 'opus',
+  instructions?: string,
 ): Promise<ReviewGuide> {
   const client = new Anthropic();
   const modelId = MODEL_IDS[model];
@@ -141,10 +142,14 @@ export async function generateReviewGuide(
 
     let fullText = '';
 
+    const system = instructions?.trim()
+      ? `${SYSTEM_PROMPT}\n\nREVIEWER INSTRUCTIONS: ${instructions.trim()}`
+      : SYSTEM_PROMPT;
+
     const stream = client.messages.stream({
       model: modelId,
       max_tokens: 32768,
-      system: SYSTEM_PROMPT,
+      system,
       messages: [{ role: 'user', content: userMessage }],
     });
 
