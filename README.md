@@ -18,14 +18,15 @@ npm install
 npm start
 ```
 
-On first launch, enter your GitHub personal access token in the settings field. It's stored locally in your OS user data directory. Alternatively, set `GITHUB_TOKEN` in your environment — it takes precedence.
+On first launch, click **Connect GitHub** to authenticate via OAuth. Alternatively, set `GITHUB_TOKEN` in your environment — it takes precedence over OAuth.
 
 ## Usage
 
 1. Paste a GitHub PR URL
 2. Pick a model (Opus 4.6 for best quality, Sonnet 4.6 for speed)
-3. Optionally add reviewer instructions — e.g. *focus on security*, *explain the auth flow*
-4. Hit **Generate Review**
+3. Optionally enable **Extended thinking** for deeper reasoning on complex PRs (slower)
+4. Optionally add reviewer instructions — e.g. *focus on security*, *explain the auth flow*
+5. Hit **Generate Review**
 
 The app fetches the PR diff and file contents via the GitHub API, builds a context package, and sends it to Claude via the Claude CLI. Claude returns an ordered set of slides grouped by logical dependency.
 
@@ -42,10 +43,6 @@ xattr -cr /Applications/Gnosis.app
 ```
 
 Then double-click to open normally.
-
-## GitHub Token
-
-Create a token at [github.com/settings/tokens](https://github.com/settings/tokens) with `repo` read access (or `public_repo` if you only review public repositories).
 
 ## Build
 
