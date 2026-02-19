@@ -59,12 +59,12 @@ export function SlideView({ slide }: Props) {
           </Badge>
         </div>
 
-        <h2 className="text-xl font-semibold leading-tight">{slide.title}</h2>
+        <h2 className="text-lg font-semibold leading-tight">{slide.title}</h2>
 
         <p className="text-sm text-muted-foreground leading-relaxed"><InlineCode text={slide.narrative} /></p>
 
         {/* Review focus */}
-        <Card className="border-2">
+        <Card className="border">
           <CardHeader className="pb-2 pt-3 px-4">
             <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
               What to check
