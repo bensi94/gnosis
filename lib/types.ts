@@ -26,6 +26,7 @@ export interface Slide {
   contextSnippets: string[];
   affectedFiles: string[];
   dependsOn: string[];
+  mermaidDiagram?: string | null;
 }
 
 export interface ReviewGuide {

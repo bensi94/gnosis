@@ -19,8 +19,29 @@ GROUPING: Group changes that are logically related and should be understood toge
 
 NARRATIVE: For each slide, explain WHY this changed, not just WHAT changed.
 - Assume the reviewer is smart but hasn't read the PR description carefully
-- One clear sentence about the business/technical motivation
-- Call out anything non-obvious
+- Lead with the business or technical motivation in one sentence
+- Then explain what specifically changed and how it works
+- Wrap up with anything non-obvious or worth keeping in mind
+- Write 2–4 short paragraphs — never one dense wall of text
+- Use backtick notation for code symbols: \`symbolName\`
+
+REVIEW FOCUS: Write 2–4 numbered points, each a short actionable check.
+- "1) Check that ... 2) Verify that ..."
+- Each point should be a single clear sentence
+- Focus on what could actually go wrong, not just what to look at
+
+MERMAID DIAGRAM (optional): Include a Mermaid diagram when it genuinely helps the reviewer understand the flow or structure. Omit it (null) when the change is simple or the diagram would add clutter.
+- Use sequenceDiagram for request/response flows, async calls, event handling, or service interactions
+- Use flowchart TD for conditional logic, branching, or state transitions
+- Use classDiagram for data model changes or new type hierarchies
+- Keep diagrams small: 5–8 nodes max. Label edges clearly. Omit obvious steps.
+- The diagram should show the BEHAVIOUR, not just list the classes in the diff
+
+WRITING STYLE (apply to all text fields — narrative, reviewFocus, summary, riskRationale):
+- Short sentences. Plain words. No jargon when plain English works.
+- One idea per sentence. One topic per paragraph.
+- Avoid filler: "It's worth noting that", "This means that", "In order to"
+- Never pad text to seem thorough — concise and clear beats long and complete
 
 RISK: Assess overall risk based on:
 - Changes to auth, payments, data models, or public APIs = high risk
@@ -42,7 +63,7 @@ You must respond with valid JSON matching the ReviewGuide schema exactly. No mar
 
 const USER_SUFFIX = `
 
-Produce a ReviewGuide JSON object for this pull request. The slides array must be ordered for optimal review flow as described. Every slide must have a clear narrative and reviewFocus.
+Produce a ReviewGuide JSON object for this pull request. The slides array must be ordered for optimal review flow as described. Every slide must have a clear narrative and reviewFocus. Remember: short paragraphs, plain language, one idea per sentence — the goal is to reduce cognitive load for the reviewer.
 
 The JSON must match this schema exactly:
 {
@@ -74,7 +95,8 @@ The JSON must match this schema exactly:
       ],
       "contextSnippets": string[],
       "affectedFiles": string[],
-      "dependsOn": string[]
+      "dependsOn": string[],
+      "mermaidDiagram": string | null
     }
   ]
 }`;

@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DiffHunkGroup } from '@/components/DiffHunk';
 import { InlineCode } from '@/components/InlineCode';
+import { MermaidDiagram } from '@/components/MermaidDiagram';
 import type { Slide, SlideType, DiffHunk } from '@/lib/types';
 
 interface Props {
@@ -39,7 +40,8 @@ export function SlideView({ slide }: Props) {
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* Left panel — narrative */}
-      <div className="w-2/5 overflow-y-auto border-r p-6 flex flex-col gap-5">
+      <div className="w-2/5 overflow-y-auto border-r min-h-0">
+        <div className="p-6 flex flex-col gap-5">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge
             variant="outline"
@@ -101,16 +103,25 @@ export function SlideView({ slide }: Props) {
             </div>
           </details>
         )}
+        </div>
       </div>
 
-      {/* Right panel — diffs */}
-      <div className="w-3/5 overflow-y-auto p-6 flex flex-col gap-4">
+      {/* Right panel — diagram + diffs */}
+      <div className="w-3/5 overflow-y-auto min-h-0">
+        <div className="p-6 flex flex-col gap-4">
+        {slide.mermaidDiagram && (
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Diagram</p>
+            <MermaidDiagram chart={slide.mermaidDiagram} />
+          </div>
+        )}
         {groupedHunks.length === 0 && (
           <p className="text-sm text-muted-foreground italic">No diff hunks for this slide.</p>
         )}
         {groupedHunks.map(({ filePath, hunks }) => (
           <DiffHunkGroup key={filePath} filePath={filePath} hunks={hunks} />
         ))}
+        </div>
       </div>
     </div>
   );
