@@ -37,6 +37,7 @@ export function SubmitReviewDialog({
   const [error, setError] = useState<string | null>(null);
   const [successUrl, setSuccessUrl] = useState<string | null>(null);
   const [droppedCount, setDroppedCount] = useState(0);
+  const [submittedCount, setSubmittedCount] = useState(0);
 
   // Group comments by file for the summary
   const fileGroups = new Map<string, PendingReviewComment[]>();
@@ -49,6 +50,7 @@ export function SubmitReviewDialog({
     setSubmitting(true);
     setError(null);
     try {
+      setSubmittedCount(comments.length);
       const result = await onSubmit(event, body);
       setSuccessUrl(result.reviewUrl);
       setDroppedCount(result.droppedCommentCount);
@@ -78,7 +80,7 @@ export function SubmitReviewDialog({
               Review submitted
             </DialogTitle>
             <DialogDescription>
-              Your review with {comments.length} comment{comments.length !== 1 ? 's' : ''} has been posted.
+              Your review with {submittedCount} comment{submittedCount !== 1 ? 's' : ''} has been posted.
             </DialogDescription>
           </DialogHeader>
           {droppedCount > 0 && (
