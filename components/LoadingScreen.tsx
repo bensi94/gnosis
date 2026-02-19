@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import { Brain, GitPullRequest, FileCode, Loader } from 'lucide-react';
 

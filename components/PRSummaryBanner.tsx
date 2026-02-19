@@ -1,5 +1,3 @@
-'use client';
-
 import { ExternalLink, Files, GitCommitHorizontal, Clock, ArrowLeft, Settings } from 'lucide-react';
 import { GitHubIcon } from '@/lib/constants';
 import { Card, CardContent } from '@/components/ui/card';

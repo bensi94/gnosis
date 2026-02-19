@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { Maximize2 } from 'lucide-react';

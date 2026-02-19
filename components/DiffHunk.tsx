@@ -1,5 +1,3 @@
-'use client';
-
 import type { DiffHunk as DiffHunkType } from '@/lib/types';
 
 interface Props {
