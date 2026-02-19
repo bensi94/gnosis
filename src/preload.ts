@@ -6,8 +6,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('generate-review', req),
   getConfig: (): Promise<{ githubToken: string | null }> =>
     ipcRenderer.invoke('get-config'),
-  saveConfig: (cfg: { githubToken: string | null }): Promise<void> =>
-    ipcRenderer.invoke('save-config', cfg),
+  startOAuth: (): Promise<void> =>
+    ipcRenderer.invoke('start-oauth'),
+  getAuthState: (): Promise<{ authenticated: boolean; login: string | null }> =>
+    ipcRenderer.invoke('get-auth-state'),
+  signOut: (): Promise<void> =>
+    ipcRenderer.invoke('sign-out'),
   listReviews: (): Promise<ReviewHistoryEntry[]> =>
     ipcRenderer.invoke('list-reviews'),
   loadReview: (id: string): Promise<ReviewGuide> =>

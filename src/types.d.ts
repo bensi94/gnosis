@@ -5,7 +5,9 @@ declare global {
     electronAPI: {
       generateReview: (req: GenerateReviewRequest) => Promise<ReviewGuide>;
       getConfig: () => Promise<{ githubToken: string | null }>;
-      saveConfig: (cfg: { githubToken: string | null }) => Promise<void>;
+      startOAuth: () => Promise<void>;
+      getAuthState: () => Promise<{ authenticated: boolean; login: string | null }>;
+      signOut: () => Promise<void>;
       listReviews: () => Promise<ReviewHistoryEntry[]>;
       loadReview: (id: string) => Promise<ReviewGuide>;
       deleteReview: (id: string) => Promise<void>;
