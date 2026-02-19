@@ -14,7 +14,7 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({ authors: 'Oddur Magnusson' }),
     new MakerZIP({}, ['darwin']),
     new MakerDeb({}),
     new MakerRpm({}),
