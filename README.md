@@ -1,8 +1,12 @@
 # Gnosis
 
-AI-guided code review. Paste a GitHub PR URL and get a slide-based walkthrough of the changes — ordered by dependency, with narrative explanations, syntax-highlighted diffs, and optional diagrams.
+We've gotten fast at writing code. Reviewing it hasn't kept up.
 
-Built with Electron + Vite. No server to start.
+Pull requests are still reviewed the same way they always have been — scrolling through a list of file diffs in whatever order GitHub decides to show them, with no grouping, no context, and no sense of which changes depend on which. It works, but it's slow and it's easy to miss things.
+
+Gnosis is an experiment in changing that. Paste a PR URL and it reads the diff, groups related changes together, and presents them as an ordered slideshow — foundation changes first, then the features built on top, then tests and config. Each slide has a short explanation of *why* the change is there, the relevant diff, and optionally a diagram. The goal is to walk the reviewer through the change the way the author understands it, not the way the filesystem happens to order it.
+
+It runs locally and uses Claude Code under the hood. Possibly Codex later.
 
 ## Requirements
 
@@ -24,6 +28,18 @@ xattr -cr /Applications/Gnosis.app
 
 On first launch, click **Connect GitHub** to authenticate via OAuth. Alternatively, set `GITHUB_TOKEN` in your environment — it takes precedence over OAuth.
 
+## Usage
+
+1. Paste a GitHub PR URL
+2. Pick a model (Opus 4.6 or Sonnet 4.6)
+3. Optionally enable **Extended thinking** for more thorough analysis (slower)
+4. Optionally add instructions — e.g. *focus on security*, *explain the auth flow*
+5. Hit **Generate Review**
+
+Navigate slides with **← →** or the Prev/Next buttons. Drag the divider between the narrative and diff panels to resize.
+
+Past reviews are saved locally and shown on the home screen — click any to reload without re-generating.
+
 ## Development
 
 ```bash
@@ -32,20 +48,6 @@ cd gnosis
 npm install
 npm start
 ```
-
-## Usage
-
-1. Paste a GitHub PR URL
-2. Pick a model (Opus 4.6 for best quality, Sonnet 4.6 for speed)
-3. Optionally enable **Extended thinking** for deeper reasoning on complex PRs (slower)
-4. Optionally add reviewer instructions — e.g. *focus on security*, *explain the auth flow*
-5. Hit **Generate Review**
-
-The app fetches the PR diff and file contents via the GitHub API, builds a context package, and sends it to Claude via the Claude CLI. Claude returns an ordered set of slides grouped by logical dependency.
-
-Navigate with **← →** arrow keys or the Prev/Next buttons. Drag the handle between the narrative and diff panels to resize.
-
-Past reviews are saved automatically and shown on the home screen — click any entry to reload it without re-generating.
 
 ## Build
 
