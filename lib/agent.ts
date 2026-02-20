@@ -68,11 +68,11 @@ NARRATIVE: For each slide, explain WHY this changed, not just WHAT changed.
 - Then explain what specifically changed and how it works
 - Wrap up with anything non-obvious or worth keeping in mind
 - Write 2–4 short paragraphs — never one dense wall of text
-- Use backtick notation for code symbols: \`symbolName\`
+- Use **bold** for emphasis, \`backticks\` for code symbols, and markdown lists where helpful
+- No headings in narrative — just bold, lists, inline code
 
-REVIEW FOCUS: Write 2–4 numbered points, each a short actionable check.
-- "1) Check that ... 2) Verify that ..."
-- Each point should be a single clear sentence
+REVIEW FOCUS: Write 2–4 actionable checks as a markdown bullet list.
+- Each bullet should be a single clear sentence
 - Focus on what could actually go wrong, not just what to look at
 
 MERMAID DIAGRAM (optional): Include a Mermaid diagram when it genuinely helps the reviewer understand the flow or structure. Omit it (null) when the change is simple or the diagram would add clutter.
@@ -87,6 +87,7 @@ WRITING STYLE (apply to all text fields — narrative, reviewFocus, summary, ris
 - One idea per sentence. One topic per paragraph.
 - Avoid filler: "It's worth noting that", "This means that", "In order to"
 - Never pad text to seem thorough — concise and clear beats long and complete
+- Markdown is allowed: bold, inline code, bullet lists. Use sparingly — no headings in narrative fields.
 
 RISK: Assess overall risk based on:
 - Changes to auth, payments, data models, or public APIs = high risk
@@ -104,7 +105,7 @@ Use file_contents_before and file_contents_after to understand the full shape of
 
 When generating diffHunks.content, include 10 lines of context before and after each change. Draw from the file contents if the diff context is shorter.
 
-You must respond with valid JSON matching the ReviewGuide schema exactly. No markdown, no explanation outside the JSON.`;
+You must respond with valid JSON matching the ReviewGuide schema exactly. No explanation outside the JSON.`;
 
 const USER_SUFFIX = `
 

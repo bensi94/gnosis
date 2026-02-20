@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { InlineCode } from '@/components/InlineCode';
+import { Markdown } from '@/components/Markdown';
 import type { ReviewGuide, SlideType } from '@/lib/types';
 
 interface Props {
@@ -26,16 +26,16 @@ export function OverviewSlide({ review, onNavigate }: Props) {
       {/* AI Summary */}
       <div className="flex flex-col gap-2">
         <p className="text-xs uppercase tracking-wider text-muted-foreground">AI Summary</p>
-        <p className="text-base leading-relaxed"><InlineCode text={review.summary} /></p>
+        <Markdown className="text-base leading-relaxed">{review.summary}</Markdown>
       </div>
 
       {/* PR Description */}
       {review.prDescription && (
         <div className="flex flex-col gap-2">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">PR Description</p>
-          <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed max-h-48 overflow-y-auto rounded-md border bg-muted/30 p-4">
-            {review.prDescription}
-          </pre>
+          <div className="text-sm text-muted-foreground leading-relaxed max-h-48 overflow-y-auto rounded-md border bg-muted/30 p-4">
+            <Markdown>{review.prDescription}</Markdown>
+          </div>
         </div>
       )}
 
