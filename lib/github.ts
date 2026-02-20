@@ -1,6 +1,6 @@
 import { Octokit } from '@octokit/rest';
-import { callClaudeQuick } from './agent';
-import type { ChangedFile, PrMetadata } from './types';
+import { getProvider } from './provider';
+import type { ChangedFile, PrMetadata, Provider } from './types';
 
 export function parsePrUrl(url: string): { owner: string; repo: string; pullNumber: number } {
   const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/pulls?\/(\d+)/);
@@ -145,9 +145,10 @@ Rules:
 - Include file extensions (e.g., .cs, .rs, .py, .go, .ts)
 - Return unique paths only`;
 
-async function extractImportsWithClaude(
+async function extractImportsWithLLM(
   changedFileContents: Record<string, string>,
   changedFilePaths: string[],
+  providerName: Provider,
 ): Promise<string[]> {
   const fileEntries = changedFilePaths
     .filter((p) => changedFileContents[p])
@@ -156,12 +157,16 @@ async function extractImportsWithClaude(
 
   if (!fileEntries) return [];
 
+  const provider = getProvider(providerName);
+  const quickEntry = provider.models.find((m) => m.quick) ?? provider.models[0];
+  const quickModel = quickEntry.id;
+
   try {
-    const result = await callClaudeQuick(
-      fileEntries,
-      SMART_IMPORTS_SYSTEM_PROMPT,
-      'claude-haiku-4-5-20251001',
-    );
+    const result = await provider.quick({
+      content: fileEntries,
+      systemPrompt: SMART_IMPORTS_SYSTEM_PROMPT,
+      model: quickModel,
+    });
 
     // Extract JSON array from response
     const start = result.indexOf('[');
@@ -184,12 +189,12 @@ export async function getNeighborFiles(
   changedFilePaths: string[],
   changedFileContents: Record<string, string>,
   ref: string,
-  useSmartImports?: boolean,
+  smartImportsProvider?: Provider,
 ): Promise<Record<string, string>> {
-  if (useSmartImports) {
-    console.log('[github] Using smart (Claude) import extraction');
-    const importPaths = await extractImportsWithClaude(changedFileContents, changedFilePaths);
-    console.log(`[github] Claude found ${importPaths.length} import(s):`, importPaths);
+  if (smartImportsProvider) {
+    console.log(`[github] Using smart (${smartImportsProvider}) import extraction`);
+    const importPaths = await extractImportsWithLLM(changedFileContents, changedFilePaths, smartImportsProvider);
+    console.log(`[github] ${smartImportsProvider} found ${importPaths.length} import(s):`, importPaths);
 
     // Filter out paths already in the changed set
     const neighborPaths = importPaths.filter((p) => !changedFilePaths.includes(p));

@@ -1,50 +1,7 @@
-import { spawn, execFileSync } from 'child_process';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import type { ReviewGuide } from './types';
+import { getProvider } from './provider';
+import type { ModelId, Provider, ReviewGuide } from './types';
 
-// ── Claude binary resolution ─────────────────────────────────────
-// When launched from Dock/Finder the app gets a minimal PATH that
-// won't include npm/homebrew/volta/nvm bin dirs. Ask the login shell
-// once so the user's full profile is sourced, then cache the result.
-
-let resolvedClaudePath: string | null = null;
-
-function resolveClaudePath(): string {
-  if (resolvedClaudePath) return resolvedClaudePath;
-
-  if (process.platform === 'win32') {
-    try {
-      const result = execFileSync('where.exe', ['claude'], { encoding: 'utf-8', timeout: 5000 }).trim().split('\n')[0].trim();
-      if (result) return (resolvedClaudePath = result);
-    } catch { /* fall through */ }
-  } else {
-    for (const shell of ['/bin/zsh', '/bin/bash']) {
-      if (!fs.existsSync(shell)) continue;
-      try {
-        const result = execFileSync(shell, ['-lc', 'which claude'], { encoding: 'utf-8', timeout: 5000 }).trim();
-        if (result) return (resolvedClaudePath = result);
-      } catch { /* try next */ }
-    }
-  }
-
-  // Common install locations as a fast fallback
-  const home = os.homedir();
-  const candidates = [
-    '/usr/local/bin/claude',
-    '/opt/homebrew/bin/claude',
-    `${home}/.volta/bin/claude`,
-    `${home}/.npm-global/bin/claude`,
-    `${home}/.nvm/current/bin/claude`,
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return (resolvedClaudePath = p);
-  }
-
-  // Last resort — let spawn try PATH as-is
-  return (resolvedClaudePath = 'claude');
-}
+// ── System prompt & schema constants ─────────────────────────────
 
 const SYSTEM_PROMPT = `You are an expert code reviewer helping a developer understand a pull request before they review it. Your job is to analyze the PR and produce a guided review — a sequence of "slides" that walks the reviewer through the changes in the best possible order.
 
@@ -147,167 +104,24 @@ The JSON must match this schema exactly:
   ]
 }`;
 
-const MODEL_IDS = {
-  opus:   'claude-opus-4-6',
-  sonnet: 'claude-sonnet-4-6',
-} as const;
+const CONCISE_SUFFIX = `
 
-function callClaudeCLI(
-  userContent: string,
-  systemPrompt: string,
-  model: string,
-  thinking: boolean,
-  onChunk?: (chunk: string, isThinking: boolean) => void,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
+IMPORTANT: Be concise. Keep narrative and reviewFocus under 2 sentences each. Omit contextSnippets entirely (use empty arrays). Limit diffHunks to the 3 most important hunks per slide. Return only raw JSON starting with { and ending with }.`;
 
-    if (!thinking) env.MAX_THINKING_TOKENS = '0';
+const SIGNAL_BOOST_DIRECTIVE = `
+SIGNAL BOOST MODE — ACTIVE
+You must apply these rules on top of all other guidelines:
 
-    const claudePath = resolveClaudePath();
-    const args = [
-      '-p',
-      '--model', model,
-      '--system-prompt', systemPrompt,
-      '--tools', '',
-      '--output-format', 'stream-json',
-      '--include-partial-messages',
-      '--no-session-persistence',
-      ...(thinking ? ['--effort', 'high'] : []),
-    ];
-    const proc = spawn(claudePath, args, { env });
+1. SKIP slides for trivial changes: whitespace-only edits, import reordering, rename-only refactors, boilerplate ceremony (license headers, generated code, auto-formatted files).
+2. If there are minor changes worth noting, merge them into a single "Minor changes" slide at the END of the slides array. Otherwise omit them entirely.
+3. FOCUS slides on: system design decisions, algorithmic complexity, state management, API surface changes, security implications, error handling patterns.
+4. In reviewFocus, be more opinionated — call out what actually matters, not just what changed. Flag risks, trade-offs, and design choices the reviewer should push back on.
+`;
 
-    proc.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'ENOENT') {
-        reject(new Error(
-          `Claude Code CLI not found at "${claudePath}". ` +
-          'Install it from claude.ai/code and authenticate with `claude auth`.',
-        ));
-      } else {
-        reject(err);
-      }
-    });
+// ── Helpers ──────────────────────────────────────────────────────
 
-    const debugPath = path.join(os.tmpdir(), 'gnosis-last-response.txt');
-    const debugStream = fs.createWriteStream(debugPath, { flags: 'w' });
-    const startMs = Date.now();
-
-    let lineBuffer = '';
-    let fullText = '';
-    let stderr = '';
-
-    function processLine(line: string) {
-      const trimmed = line.trim();
-      if (!trimmed) return;
-      try {
-        const outer = JSON.parse(trimmed) as Record<string, unknown>;
-        if (outer.type === 'result' && typeof outer.result === 'string') {
-          fullText = outer.result;
-          return;
-        }
-        if (outer.type !== 'stream_event') return;
-        const inner = outer.event as Record<string, unknown> | undefined;
-        if (!inner || inner.type !== 'content_block_delta') return;
-        const delta = inner.delta as Record<string, unknown> | undefined;
-        if (!delta) return;
-        if (delta.type === 'thinking_delta' && typeof delta.thinking === 'string') {
-          onChunk?.(delta.thinking, true);
-        } else if (delta.type === 'text_delta' && typeof delta.text === 'string') {
-          fullText += delta.text;
-          onChunk?.(delta.text, false);
-        }
-      } catch {
-        // not a JSON event — ignore
-      }
-    }
-
-    proc.stdout.on('data', (chunk: Buffer) => {
-      const str = chunk.toString();
-      debugStream.write(str);
-      lineBuffer += str;
-      const newlineIdx = lineBuffer.lastIndexOf('\n');
-      if (newlineIdx === -1) return;
-      const completeLines = lineBuffer.slice(0, newlineIdx);
-      lineBuffer = lineBuffer.slice(newlineIdx + 1);
-      for (const line of completeLines.split('\n')) processLine(line);
-      const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
-      console.log(`[agent] +${elapsed}s fullText=${fullText.length} bytes`);
-    });
-    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-
-    proc.stdin.write(userContent);
-    proc.stdin.end();
-
-    proc.on('close', (code: number | null) => {
-      debugStream.end();
-      // Flush any remaining buffered line
-      if (lineBuffer.trim()) processLine(lineBuffer);
-      if (code === 0) {
-        const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
-        console.log(`[agent] CLI finished in ${elapsed}s, ${fullText.length} chars → ${debugPath}`);
-        resolve(fullText.trim());
-      } else {
-        reject(new Error(`Claude CLI exited with code ${code}: ${stderr.slice(0, 300)}`));
-      }
-    });
-  });
-}
-
-export function callClaudeQuick(
-  userContent: string,
-  systemPrompt: string,
-  model: string,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    env.MAX_THINKING_TOKENS = '0';
-
-    const claudePath = resolveClaudePath();
-    const args = [
-      '-p',
-      '--model', model,
-      '--system-prompt', systemPrompt,
-      '--tools', '',
-      '--output-format', 'text',
-      '--no-session-persistence',
-    ];
-    const proc = spawn(claudePath, args, { env });
-
-    proc.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'ENOENT') {
-        reject(new Error(
-          `Claude Code CLI not found at "${claudePath}". ` +
-          'Install it from claude.ai/code and authenticate with `claude auth`.',
-        ));
-      } else {
-        reject(err);
-      }
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
-    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-
-    proc.stdin.write(userContent);
-    proc.stdin.end();
-
-    proc.on('close', (code: number | null) => {
-      if (code === 0) {
-        resolve(stdout.trim());
-      } else {
-        reject(new Error(`Claude CLI exited with code ${code}: ${stderr.slice(0, 300)}`));
-      }
-    });
-  });
-}
-
+/** Strip markdown fences or surrounding text, returning just the JSON object. */
 function extractJson(text: string): string {
-  // Find the first { and last } — works regardless of markdown fences or
-  // whether the JSON content itself contains ``` sequences.
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start !== -1 && end > start) return text.slice(start, end + 1);
@@ -325,32 +139,21 @@ function validateReviewGuide(obj: unknown): obj is ReviewGuide {
   );
 }
 
-const CONCISE_SUFFIX = `
-
-IMPORTANT: Be concise. Keep narrative and reviewFocus under 2 sentences each. Omit contextSnippets entirely (use empty arrays). Limit diffHunks to the 3 most important hunks per slide. Return only raw JSON starting with { and ending with }.`;
-
-const SIGNAL_BOOST_DIRECTIVE = `
-SIGNAL BOOST MODE — ACTIVE
-You must apply these rules on top of all other guidelines:
-
-1. SKIP slides for trivial changes: whitespace-only edits, import reordering, rename-only refactors, boilerplate ceremony (license headers, generated code, auto-formatted files).
-2. If there are minor changes worth noting, merge them into a single "Minor changes" slide at the END of the slides array. Otherwise omit them entirely.
-3. FOCUS slides on: system design decisions, algorithmic complexity, state management, API surface changes, security implications, error handling patterns.
-4. In reviewFocus, be more opinionated — call out what actually matters, not just what changed. Flag risks, trade-offs, and design choices the reviewer should push back on.
-`;
+// ── Main entry point ─────────────────────────────────────────────
 
 export async function generateReviewGuide(
   contextPackage: string,
   prUrl: string,
-  model: 'opus' | 'sonnet' = 'opus',
+  providerName: Provider,
+  model: ModelId,
   instructions?: string,
   onChunk?: (chunk: string, isThinking: boolean) => void,
   thinking: boolean = false,
   signalBoost: boolean = false,
 ): Promise<ReviewGuide> {
-  const modelId = MODEL_IDS[model];
+  const provider = getProvider(providerName);
 
-  async function attempt(extraInstruction: string = ''): Promise<{ guide: ReviewGuide; truncated: boolean }> {
+  async function attempt(extraInstruction: string = ''): Promise<ReviewGuide> {
     const customInstructions = instructions?.trim();
     const userMessage = customInstructions
       ? contextPackage + USER_SUFFIX + extraInstruction + `\n\n<reviewer_instructions>\nThe reviewer has provided custom instructions that MUST take priority over default style guidelines.\n${customInstructions}\n</reviewer_instructions>`
@@ -365,8 +168,14 @@ export async function generateReviewGuide(
       : baseSystem;
 
     console.log('[agent] Custom instructions:', customInstructions ?? '(none)');
-    console.log('[agent] Calling Claude CLI...');
-    const fullText = await callClaudeCLI(userMessage, system, modelId, thinking, onChunk);
+    console.log(`[agent] Calling ${providerName} (${model})...`);
+    const fullText = await provider.generate({
+      content: userMessage,
+      systemPrompt: system,
+      model,
+      thinking,
+      onChunk,
+    });
     console.log('[agent] Generation complete, parsing response...');
 
     const jsonText = extractJson(fullText);
@@ -382,36 +191,19 @@ export async function generateReviewGuide(
     }
 
     (parsed as ReviewGuide).prUrl = prUrl;
-    return { guide: parsed as ReviewGuide, truncated: false };
+    return parsed as ReviewGuide;
   }
 
-  // First attempt
-  let result: { guide: ReviewGuide; truncated: boolean };
   try {
-    result = await attempt();
+    return await attempt();
   } catch (err) {
-    const isTruncated = err instanceof Error && err.message === 'truncated';
-    console.warn(`[agent] First attempt failed (${isTruncated ? 'truncated' : 'parse error'}), retrying concisely`);
+    console.warn(`[agent] First attempt failed (${err instanceof Error ? err.message : 'unknown'}), retrying concisely`);
     try {
-      result = await attempt(CONCISE_SUFFIX);
+      return await attempt(CONCISE_SUFFIX);
     } catch (retryErr) {
       throw new Error(
         `AI review generation failed after retry: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`
       );
     }
   }
-
-  // If first attempt succeeded but was truncated, retry concisely
-  if (result.truncated) {
-    console.warn('[agent] Response was truncated, retrying with concise instructions');
-    try {
-      result = await attempt(CONCISE_SUFFIX);
-    } catch (retryErr) {
-      throw new Error(
-        `AI review generation failed after retry: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`
-      );
-    }
-  }
-
-  return result.guide;
 }

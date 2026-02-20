@@ -4,7 +4,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { LoadingScreen } from '../../components/LoadingScreen';
-import type { ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
+import type { ModelId, Provider, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
 import { timeAgo } from '../../lib/utils';
 
 interface Props {
@@ -20,10 +20,88 @@ const riskConfig = {
   high:   { label: 'High',   className: 'bg-red-900 text-red-200 border-red-700' },
 };
 
+const PROVIDERS = {
+  claude: {
+    label: 'Claude',
+    models: [
+      { id: 'claude-opus-4-6', label: 'Opus 4.6' },
+      { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+      { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+    ],
+  },
+  gemini: {
+    label: 'Gemini',
+    models: [
+      { id: 'gemini-3.1-pro-preview', label: '3.1 Pro' },
+      { id: 'gemini-3-pro-preview', label: '3 Pro' },
+      { id: 'gemini-3-flash-preview', label: '3 Flash' },
+      { id: 'gemini-2.5-pro', label: '2.5 Pro' },
+      { id: 'gemini-2.5-flash', label: '2.5 Flash' },
+    ],
+  },
+} as const;
+
+const MODEL_LABELS: Record<string, string> = Object.fromEntries(
+  Object.values(PROVIDERS).flatMap((p) =>
+    p.models.map((m) => [m.id, `${p.label} ${m.label}`]),
+  ),
+);
+
+// ── Reusable toggle switch ──────────────────────────────────────
+
+interface ToggleSwitchProps {
+  id: string;
+  label: string;
+  description: string;
+  checked: boolean;
+  onToggle: () => void;
+  badge?: string;
+}
+
+function ToggleSwitch({ id, label, description, checked, onToggle, badge }: ToggleSwitchProps) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-0.5">
+        <label htmlFor={id} className="text-sm font-medium">
+          {label}
+          {badge && (
+            <>
+              {' '}
+              <span className="ml-1 inline-block rounded bg-amber-900/60 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 leading-none align-middle">
+                {badge}
+              </span>
+            </>
+          )}
+        </label>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <button
+        id={id}
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={onToggle}
+        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          checked ? 'bg-primary' : 'bg-input'
+        }`}
+      >
+        <span
+          className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
+            checked ? 'translate-x-4' : 'translate-x-0'
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+// ── Main page ───────────────────────────────────────────────────
+
 export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [prUrl, setPrUrl] = useState(prefillPrUrl ?? '');
-  const [model, setModel] = useState<'opus' | 'sonnet'>('opus');
+  const [provider, setProvider] = useState<Provider>('claude');
+  const [model, setModel] = useState<ModelId>('claude-opus-4-6');
   const [thinking, setThinking] = useState(false);
   const [signalBoost, setSignalBoost] = useState(false);
   const [smartImports, setSmartImports] = useState(false);
@@ -81,6 +159,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     try {
       const review = await window.electronAPI.generateReview({
         prUrl: prUrl.trim(),
+        provider,
         model,
         instructions: instructions.trim() || undefined,
         thinking,
@@ -114,10 +193,16 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     setHistory((prev) => prev.filter((h) => h.id !== id));
   }
 
+  function handleProviderChange(p: Provider) {
+    setProvider(p);
+    setModel(PROVIDERS[p].models[0].id);
+    if (p === 'gemini') setThinking(false);
+  }
+
   if (loading) {
     return (
       <LoadingScreen
-        message={isThinkingPhase ? 'Claude is thinking...' : 'Generating review guide...'}
+        message={isThinkingPhase ? 'Thinking...' : 'Generating review guide...'}
         streamingText={streamingText}
       />
     );
@@ -184,7 +269,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
           </div>
         )}
 
-        {/* PR form — only shown when authenticated */}
+        {/* PR form -- only shown when authenticated */}
         {isAuthenticated && (
           <Card>
             <CardContent className="pt-6">
@@ -220,112 +305,72 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Model</label>
+                  <label className="text-sm font-medium">Provider</label>
                   <div className="flex gap-2">
-                    {(['opus', 'sonnet'] as const).map((m) => (
+                    {(['claude', 'gemini'] as const).map((p) => (
                       <button
-                        key={m}
+                        key={p}
                         type="button"
-                        onClick={() => setModel(m)}
+                        onClick={() => handleProviderChange(p)}
                         className={`flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                          model === m
+                          provider === p
                             ? 'border-primary bg-primary text-primary-foreground'
                             : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
                         }`}
                       >
-                        {m === 'opus' ? 'Opus 4.6' : 'Sonnet 4.6'}
+                        {PROVIDERS[p].label}
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {model === 'opus' ? 'Best quality · slower' : 'Faster · lower cost'}
-                  </p>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5">
-                    <label htmlFor="thinking" className="text-sm font-medium">Extended thinking</label>
-                    <p className="text-xs text-muted-foreground">
-                      {thinking ? 'Deeper reasoning · slower' : 'Standard speed'}
-                    </p>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">Model</label>
+                  <div className="flex flex-wrap gap-2">
+                    {PROVIDERS[provider].models.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setModel(m.id)}
+                        className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                          model === m.id
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
                   </div>
-                  <button
+                </div>
+
+                {provider === 'claude' && (
+                  <ToggleSwitch
                     id="thinking"
-                    type="button"
-                    role="switch"
-                    aria-checked={thinking}
-                    onClick={() => setThinking((t) => !t)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      thinking ? 'bg-primary' : 'bg-input'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                        thinking ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
+                    label="Extended thinking"
+                    description={thinking ? 'Deeper reasoning · slower' : 'Standard speed'}
+                    checked={thinking}
+                    onToggle={() => setThinking((t) => !t)}
+                  />
+                )}
 
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5">
-                    <label htmlFor="signal-boost" className="text-sm font-medium">
-                      Signal boost{' '}
-                      <span className="ml-1 inline-block rounded bg-amber-900/60 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 leading-none align-middle">
-                        Experimental
-                      </span>
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Skip trivial changes, focus on design and complexity
-                    </p>
-                  </div>
-                  <button
-                    id="signal-boost"
-                    type="button"
-                    role="switch"
-                    aria-checked={signalBoost}
-                    onClick={() => setSignalBoost((s) => !s)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      signalBoost ? 'bg-primary' : 'bg-input'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                        signalBoost ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
+                <ToggleSwitch
+                  id="signal-boost"
+                  label="Signal boost"
+                  description="Skip trivial changes, focus on design and complexity"
+                  checked={signalBoost}
+                  onToggle={() => setSignalBoost((s) => !s)}
+                  badge="Experimental"
+                />
 
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5">
-                    <label htmlFor="smart-imports" className="text-sm font-medium">
-                      Smart imports{' '}
-                      <span className="ml-1 inline-block rounded bg-amber-900/60 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 leading-none align-middle">
-                        Experimental
-                      </span>
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Use AI to find related files across all languages
-                    </p>
-                  </div>
-                  <button
-                    id="smart-imports"
-                    type="button"
-                    role="switch"
-                    aria-checked={smartImports}
-                    onClick={() => setSmartImports((s) => !s)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      smartImports ? 'bg-primary' : 'bg-input'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                        smartImports ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
+                <ToggleSwitch
+                  id="smart-imports"
+                  label="Smart imports"
+                  description="Use AI to find related files across all languages"
+                  checked={smartImports}
+                  onToggle={() => setSmartImports((s) => !s)}
+                  badge="Experimental"
+                />
 
                 {error && (
                   <Alert variant="destructive">
@@ -359,7 +404,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                           <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                             <span className="text-sm font-medium truncate">{entry.prTitle}</span>
                             <span className="text-xs text-muted-foreground truncate">
-                              {entry.author} · {timeAgo(entry.savedAt)}
+                              {entry.author} · {entry.model ? MODEL_LABELS[entry.model] ?? entry.model : 'Unknown'} · {timeAgo(entry.savedAt)}
                             </span>
                           </div>
                           <Badge variant="outline" className={`shrink-0 text-xs ${risk.className}`}>
