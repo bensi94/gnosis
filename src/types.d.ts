@@ -34,6 +34,7 @@ declare global {
       offUpdateAvailable: () => void;
       dismissUpdate: (version: string) => Promise<void>;
       openExternal: (url: string) => Promise<void>;
+      platform: NodeJS.Platform;
     };
   }
 }

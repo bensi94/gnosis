@@ -45,4 +45,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   dismissUpdate: (version: string): Promise<void> => ipcRenderer.invoke('dismiss-update', version),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),
+  platform: process.platform,
 });

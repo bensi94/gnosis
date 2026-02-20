@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowUpCircle, X, Copy, Check } from 'lucide-react';
+import { ArrowUpCircle, X, Copy, Check, Download } from 'lucide-react';
 import type { UpdateInfo } from '../lib/types';
 
 const BREW_COMMAND = 'brew update && brew upgrade --cask gnosis';
@@ -7,6 +7,7 @@ const BREW_COMMAND = 'brew update && brew upgrade --cask gnosis';
 export function UpdateBanner() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [copied, setCopied] = useState(false);
+  const isMac = window.electronAPI.platform === 'darwin';
 
   useEffect(() => {
     window.electronAPI.onUpdateAvailable((info) => setUpdate(info));
@@ -25,6 +26,10 @@ export function UpdateBanner() {
     });
   }, []);
 
+  const handleDownload = useCallback((url: string) => {
+    void window.electronAPI.openExternal(url);
+  }, []);
+
   if (!update) return null;
 
   return (
@@ -34,10 +39,26 @@ export function UpdateBanner() {
         <span>
           Gnosis <strong>v{update.version}</strong> is available
         </span>
-        <code className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-xs font-mono">{BREW_COMMAND}</code>
-        <button onClick={handleCopy} className="rounded p-0.5 transition-colors hover:bg-white/10" title="Copy command">
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        </button>
+        {isMac ? (
+          <>
+            <code className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-xs font-mono">{BREW_COMMAND}</code>
+            <button
+              onClick={handleCopy}
+              className="rounded p-0.5 transition-colors hover:bg-white/10"
+              title="Copy command"
+            >
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => handleDownload(update.releaseUrl)}
+            className="ml-1 inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors updateBanner-btn"
+          >
+            <Download className="h-3 w-3" />
+            Download
+          </button>
+        )}
       </div>
       <button onClick={() => handleDismiss(update.version)} className="shrink-0 transition-opacity hover:opacity-80">
         <X className="h-3.5 w-3.5" />
