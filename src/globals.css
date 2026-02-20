@@ -364,6 +364,15 @@
   line-height: inherit;
 }
 
+/* ─── Mermaid fullscreen dialog ───────────────────────────────── */
+
+.mermaid-fullscreen svg {
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: calc(90vh - 6rem);
+}
+
 /* ─── Slide transitions (Priority 3) ─────────────────────────── */
 
 @keyframes slide-enter {
