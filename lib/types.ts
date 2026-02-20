@@ -56,6 +56,7 @@ export interface GenerateReviewRequest {
   model: 'opus' | 'sonnet';
   instructions?: string;
   thinking?: boolean;
+  signalBoost?: boolean;
 }
 
 export interface GenerateReviewResponse {
