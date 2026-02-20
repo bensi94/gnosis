@@ -16,7 +16,7 @@ import { buildContextPackage } from '../lib/context-builder';
 import { generateReviewGuide } from '../lib/agent';
 import { renderDiffHunk, inferLanguage } from '../lib/highlight';
 import { parsePatchValidLines } from '../lib/diff-lines';
-import type { GenerateReviewRequest, ReviewGuide, ReviewHistoryEntry, SubmitReviewRequest } from '../lib/types';
+import type { GenerateReviewRequest, ReviewGuide, ReviewHistoryEntry, SubmitReviewRequest, FreshnessResult } from '../lib/types';
 
 // Injected by Electron Forge Vite plugin
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -335,6 +335,56 @@ ipcMain.handle('delete-review', async (_event, id: string) => {
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   const index = readReviewsIndex().filter((e) => e.id !== id);
   fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
+});
+
+ipcMain.handle('check-pr-freshness', async (_event, prUrl: string, headSha: string | undefined): Promise<FreshnessResult> => {
+  if (!headSha) {
+    return { status: 'unknown', reason: 'Review has no stored head SHA' };
+  }
+
+  const token = getResolvedToken();
+  const octokit = new Octokit({ auth: token ?? undefined });
+  const { owner, repo, pullNumber } = parsePrUrl(prUrl);
+
+  try {
+    const prData = await getPrMetadata(octokit, owner, repo, pullNumber);
+    const currentSha = prData.headSha;
+
+    if (currentSha === headSha) {
+      return { status: 'current' };
+    }
+
+    try {
+      const { data } = await octokit.repos.compareCommits({
+        owner,
+        repo,
+        base: headSha,
+        head: currentSha,
+      });
+
+      const commits = (data.commits ?? []).slice(0, 50).map((c) => ({
+        sha: c.sha,
+        message: (c.commit.message ?? '').split('\n')[0],
+        authorLogin: c.author?.login ?? c.commit.author?.name ?? 'unknown',
+        authorDate: c.commit.author?.date ?? '',
+      }));
+
+      return {
+        status: 'stale',
+        aheadBy: data.ahead_by ?? commits.length,
+        commits,
+      };
+    } catch (compareErr: unknown) {
+      const status = (compareErr as { status?: number })?.status;
+      if (status === 404) {
+        return { status: 'force-pushed' };
+      }
+      throw compareErr;
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return { status: 'unknown', reason: message };
+  }
 });
 
 ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, thinking, signalBoost }: GenerateReviewRequest) => {

@@ -94,6 +94,19 @@ export interface ChangedFile {
   previous_filename?: string;
 }
 
+export interface FreshnessCommit {
+  sha: string;
+  message: string;
+  authorLogin: string;
+  authorDate: string;
+}
+
+export type FreshnessResult =
+  | { status: 'current' }
+  | { status: 'stale'; aheadBy: number; commits: FreshnessCommit[] }
+  | { status: 'force-pushed' }
+  | { status: 'unknown'; reason: string };
+
 export interface PrMetadata {
   title: string;
   description: string;

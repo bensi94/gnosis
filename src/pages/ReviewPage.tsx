@@ -1,26 +1,37 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { PRSummaryBanner } from '../../components/PRSummaryBanner';
+import { StaleBanner } from '../../components/StaleBanner';
 import { OverviewSlide } from '../../components/OverviewSlide';
 import { SlideView } from '../../components/SlideView';
 import { SlideNav } from '../../components/SlideNav';
 import { SubmitReviewDialog } from '../../components/SubmitReviewDialog';
 import { useReviewComments } from '../../lib/use-review-comments';
-import type { ReviewGuide, ReviewEvent } from '../../lib/types';
+import type { ReviewGuide, ReviewEvent, FreshnessResult } from '../../lib/types';
 
 interface Props {
   review: ReviewGuide;
   onBack: () => void;
+  onReReview: (prUrl: string) => void;
 }
 
-export function ReviewPage({ review, onBack }: Props) {
+export function ReviewPage({ review, onBack, onReReview }: Props) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [currentLogin, setCurrentLogin] = useState<string | null>(null);
+  const [freshness, setFreshness] = useState<FreshnessResult | null>(null);
   const { comments, addComment, removeComment, editComment, clearAll } = useReviewComments();
 
   useEffect(() => {
     window.electronAPI.getAuthState().then((state) => setCurrentLogin(state.login));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    window.electronAPI.checkPrFreshness(review.prUrl, review.headSha).then((result) => {
+      if (!cancelled) setFreshness(result);
+    });
+    return () => { cancelled = true; };
+  }, [review.prUrl, review.headSha]);
 
   const handlePrev = useCallback(() => {
     setCurrentSlide((n) => Math.max(0, n - 1));
@@ -84,6 +95,10 @@ export function ReviewPage({ review, onBack }: Props) {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <PRSummaryBanner review={review} />
+
+      {freshness && (
+        <StaleBanner freshness={freshness} onReReview={() => onReReview(review.prUrl)} />
+      )}
 
       {currentSlide === 0 ? (
         <OverviewSlide review={review} onNavigate={(n) => setCurrentSlide(n)} />
