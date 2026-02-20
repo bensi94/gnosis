@@ -34,6 +34,8 @@ declare global {
       offUpdateAvailable: () => void;
       dismissUpdate: (version: string) => Promise<void>;
       openExternal: (url: string) => Promise<void>;
+      detectBinaryPath: (name: string) => Promise<string>;
+      checkCliInstalled: (provider: string) => Promise<{ installed: boolean; resolvedPath: string }>;
       platform: NodeJS.Platform;
     };
   }

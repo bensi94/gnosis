@@ -4,26 +4,33 @@ import os from 'os';
 import path from 'path';
 
 const cache = new Map<string, string>();
+const overrides = new Map<string, string>();
 
 function cacheAndReturn(name: string, resolved: string): string {
   cache.set(name, resolved);
   return resolved;
 }
 
-/**
- * Resolve the absolute path to a CLI binary. On macOS/Linux the user's
- * login shell is invoked so that profile-managed paths (Homebrew, Volta,
- * nvm, etc.) are visible even when the app is launched from Finder/Dock.
- */
-export function resolveBinaryPath(name: string, extraCandidates: string[] = []): string {
-  const cached = cache.get(name);
-  if (cached) return cached;
+export function setBinaryOverride(name: string, overridePath: string): void {
+  if (overridePath) {
+    overrides.set(name, overridePath);
+  } else {
+    overrides.delete(name);
+  }
+  cache.delete(name);
+}
 
+/**
+ * Auto-detect the absolute path to a CLI binary, ignoring overrides and cache.
+ * On macOS/Linux the user's login shell is invoked so that profile-managed
+ * paths (Homebrew, Volta, nvm, etc.) are visible even when launched from Finder/Dock.
+ */
+export function detectBinaryPath(name: string, extraCandidates: string[] = []): string {
   if (process.platform === 'win32') {
     try {
       const raw = execFileSync('where.exe', [name], { encoding: 'utf-8', timeout: 5000 });
       const result = raw.trim().split('\n')[0].trim();
-      if (result) return cacheAndReturn(name, result);
+      if (result) return result;
     } catch {
       /* fall through */
     }
@@ -32,7 +39,7 @@ export function resolveBinaryPath(name: string, extraCandidates: string[] = []):
       if (!fs.existsSync(shell)) continue;
       try {
         const result = execFileSync(shell, ['-lc', `which ${name}`], { encoding: 'utf-8', timeout: 5000 }).trim();
-        if (result) return cacheAndReturn(name, result);
+        if (result) return result;
       } catch {
         /* try next */
       }
@@ -47,11 +54,47 @@ export function resolveBinaryPath(name: string, extraCandidates: string[] = []):
     `${home}/.nvm/current/bin/${name}`,
     ...extraCandidates,
   ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return cacheAndReturn(name, p);
+
+  // Scan nvm versioned directories (newest first)
+  const nvmVersionsDir = path.join(home, '.nvm', 'versions', 'node');
+  if (fs.existsSync(nvmVersionsDir)) {
+    try {
+      const versions = fs
+        .readdirSync(nvmVersionsDir)
+        .filter((d) => d.startsWith('v'))
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+      for (const v of versions) {
+        candidates.push(path.join(nvmVersionsDir, v, 'bin', name));
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
-  return cacheAndReturn(name, name);
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      console.log(`[detect] ${name} → ${p}`);
+      return p;
+    }
+  }
+
+  console.log(`[detect] ${name} → fallback (not found)`);
+  return name;
+}
+
+/**
+ * Resolve the absolute path to a CLI binary. Checks user overrides first,
+ * then cache, then falls back to auto-detection.
+ */
+export function resolveBinaryPath(name: string, extraCandidates: string[] = []): string {
+  const override = overrides.get(name);
+  if (override) return override;
+
+  const cached = cache.get(name);
+  if (cached) return cached;
+
+  const detected = detectBinaryPath(name, extraCandidates);
+  return cacheAndReturn(name, detected);
 }
 
 // ── Shared CLI spawn helpers ────────────────────────────────────

@@ -19,6 +19,7 @@ import { Badge } from '../../components/ui/badge';
 import { LoadingScreen } from '../../components/LoadingScreen';
 import { PRPickerDialog } from '../../components/PRPickerDialog';
 import { SettingsDialog } from '../../components/SettingsDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { riskConfig } from '../../lib/constants';
 import type { ModelId, Preferences, Provider, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
 import { timeAgo, formatDuration, groupReviewsByPR } from '../../lib/utils';
@@ -123,6 +124,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [history, setHistory] = useState<ReviewHistoryEntry[]>([]);
   const [prPickerOpen, setPrPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [cliNotFound, setCliNotFound] = useState<{ provider: string } | null>(null);
   const [expandedPRs, setExpandedPRs] = useState<Set<string>>(new Set());
 
   const prGroups = useMemo(() => groupReviewsByPR(history), [history]);
@@ -189,11 +191,17 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     if (!prUrl.trim()) return;
 
     savePrefs();
+    setError(null);
+
+    const { installed } = await window.electronAPI.checkCliInstalled(provider);
+    if (!installed) {
+      setCliNotFound({ provider });
+      return;
+    }
 
     setStreamingText('');
     setIsThinkingPhase(false);
     setLoading(true);
-    setError(null);
 
     window.electronAPI.onReviewProgress((chunk, isThinking) => {
       if (isThinking) {
@@ -350,6 +358,43 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                   </div>
                   <PRPickerDialog open={prPickerOpen} onOpenChange={setPrPickerOpen} onSelect={setPrUrl} />
                   <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+                  <Dialog open={cliNotFound !== null} onOpenChange={() => setCliNotFound(null)}>
+                    <DialogContent className="bg-card sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {cliNotFound?.provider === 'claude' ? 'Claude' : 'Gemini'} CLI not found
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="flex flex-col gap-3 text-sm text-muted-foreground">
+                        <p>
+                          The {cliNotFound?.provider === 'claude' ? 'Claude' : 'Gemini'} CLI could not be found on your
+                          system. Gnosis uses the CLI to generate reviews.
+                        </p>
+                        <p>
+                          {cliNotFound?.provider === 'claude'
+                            ? 'Install it from claude.ai/code and authenticate with `claude auth`.'
+                            : 'Install it from github.com/google-gemini/gemini-cli and authenticate.'}
+                        </p>
+                        <p>
+                          If the CLI is already installed but not detected, you can set the path manually in Settings.
+                        </p>
+                      </div>
+                      <div className="flex gap-2 justify-end pt-2">
+                        <Button variant="outline" onClick={() => setCliNotFound(null)}>
+                          Dismiss
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setCliNotFound(null);
+                            setSettingsOpen(true);
+                          }}
+                        >
+                          Open Settings
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
 
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="instructions" className="text-sm font-medium flex items-center gap-1.5">
