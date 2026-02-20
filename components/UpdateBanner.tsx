@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowUpCircle, X } from 'lucide-react';
+import { ArrowUpCircle, X, Copy, Check } from 'lucide-react';
 import type { UpdateInfo } from '../lib/types';
+
+const BREW_COMMAND = 'brew upgrade --cask gnosis';
 
 export function UpdateBanner() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     window.electronAPI.onUpdateAvailable((info) => setUpdate(info));
@@ -15,8 +18,11 @@ export function UpdateBanner() {
     setUpdate(null);
   }, []);
 
-  const handleDownload = useCallback((url: string) => {
-    void window.electronAPI.openExternal(url);
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(BREW_COMMAND).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }, []);
 
   if (!update) return null;
@@ -28,11 +34,9 @@ export function UpdateBanner() {
         <span>
           Gnosis <strong>v{update.version}</strong> is available
         </span>
-        <button
-          onClick={() => handleDownload(update.releaseUrl)}
-          className="ml-1 rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors updateBanner-btn"
-        >
-          Download
+        <code className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-xs font-mono">{BREW_COMMAND}</code>
+        <button onClick={handleCopy} className="rounded p-0.5 transition-colors hover:bg-white/10" title="Copy command">
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
       </div>
       <button onClick={() => handleDismiss(update.version)} className="shrink-0 transition-opacity hover:opacity-80">
