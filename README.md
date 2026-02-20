@@ -41,12 +41,28 @@ On first launch, click **Connect GitHub** to authenticate via OAuth. Alternative
 1. Paste a GitHub PR URL
 2. Pick a model (Opus 4.6 or Sonnet 4.6)
 3. Optionally enable **Extended thinking** for more thorough analysis (slower)
-4. Optionally add instructions — e.g. *focus on security*, *explain the auth flow*
+4. Optionally add custom instructions — e.g. *focus on security*, *explain the auth flow*
 5. Hit **Generate Review**
 
 Navigate slides with **← →** or the Prev/Next buttons. Drag the divider between the narrative and diff panels to resize.
 
 Past reviews are saved locally and shown on the home screen — click any to reload without re-generating.
+
+### Review comments
+
+While reviewing slides, you can add inline comments on specific diff lines. When you're done, submit the review directly to GitHub as an approval, request for changes, or comment — without leaving the app.
+
+### Signal boost
+
+Filters out trivial changes (whitespace, import reordering, boilerplate) and focuses slides on design decisions, complexity, and API surface changes. Toggle it on before generating.
+
+### Smart imports
+
+The default neighbor file detection only understands ES6 `import` statements. Enable **Smart imports** to use Claude Haiku to identify local file imports across all languages — C#, Rust, Python, Go, and anything else. This gives the reviewer context about files that the changed code depends on, even in non-JS/TS repos.
+
+### Stale review detection
+
+If a PR receives new commits after your review was generated, Gnosis shows a banner with what changed and offers to re-generate.
 
 ## Screenshots
 
