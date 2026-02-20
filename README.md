@@ -70,11 +70,13 @@ Past reviews are saved locally and grouped by PR on the home screen — click an
 
 ## Screenshots
 
-<img width="1222" height="1052" alt="image" src="https://github.com/user-attachments/assets/6f45cf71-bbeb-49d3-aefd-62fdb0b554fb" />
+<img width="1512" height="1012" alt="image" src="https://github.com/user-attachments/assets/3264f9b2-8595-4233-8e9c-f736238f7185" />
 
-<img width="1224" height="1049" alt="image" src="https://github.com/user-attachments/assets/3bafb7f5-8b18-4349-801d-d0cf79519074" />
+<img width="1512" height="1012" alt="image" src="https://github.com/user-attachments/assets/db3f28af-5a64-489f-b5d8-55fab109c103" />
 
-<img width="1219" height="1050" alt="image" src="https://github.com/user-attachments/assets/686b0b3a-2f11-467b-9b6c-b84c69c50b91" />
+<img width="1512" height="1012" alt="image" src="https://github.com/user-attachments/assets/f5e0f4aa-bf81-4817-a68d-a478f9030778" />
+<img width="1512" height="1012" alt="image" src="https://github.com/user-attachments/assets/f83e2731-9e62-4072-9a84-ff1c6ca54c6c" />
+
 
 ## Development
 
