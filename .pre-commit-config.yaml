@@ -1,0 +1,40 @@
+repos:
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint
+        entry: npx eslint --fix
+        language: system
+        types: [file]
+        files: \.(ts|tsx|js|jsx|mjs)$
+        exclude: ^(\.vite/|out/|build/|dist/|node_modules/)
+        pass_filenames: true
+
+      - id: prettier
+        name: Prettier
+        entry: npx prettier --write --ignore-unknown
+        language: system
+        types: [file]
+        files: \.(ts|tsx|js|jsx|mjs|json|css|md|yml|yaml|html)$
+        exclude: ^(\.vite/|out/|build/|dist/|node_modules/|package-lock\.json)
+        pass_filenames: true
+
+      - id: trufflehog
+        name: TruffleHog
+        description: Detect secrets in your data.
+        entry: bash -c 'trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail --no-update'
+        language: system
+        stages: [pre-commit, pre-push]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(\.vite/|out/|build/|dist/)
+      - id: end-of-file-fixer
+        exclude: ^(\.vite/|out/|build/|dist/)
+      - id: check-json
+        exclude: ^(\.vite/|out/|build/|dist/)
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']

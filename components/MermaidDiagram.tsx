@@ -29,20 +29,23 @@ export function MermaidDiagram({ chart }: Props) {
     const id = `mermaid-${++idCounter}`;
     setError(null);
 
-    mermaid.render(id, chart).then(({ svg }) => {
-      if (ref.current) {
-        ref.current.innerHTML = svg;
-        // Mermaid sets an inline max-width — remove it so the SVG fills the container
-        const svgEl = ref.current.querySelector('svg');
-        if (svgEl) {
-          svgEl.style.width = '100%';
-          svgEl.style.maxWidth = '800px';
-          svgEl.style.height = 'auto';
+    mermaid
+      .render(id, chart)
+      .then(({ svg }) => {
+        if (ref.current) {
+          ref.current.innerHTML = svg;
+          // Mermaid sets an inline max-width — remove it so the SVG fills the container
+          const svgEl = ref.current.querySelector('svg');
+          if (svgEl) {
+            svgEl.style.width = '100%';
+            svgEl.style.maxWidth = '800px';
+            svgEl.style.height = 'auto';
+          }
         }
-      }
-    }).catch((err) => {
-      setError(err instanceof Error ? err.message : String(err));
-    });
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
+      });
   }, [chart]);
 
   if (error) return null;

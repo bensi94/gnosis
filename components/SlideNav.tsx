@@ -4,11 +4,7 @@ import { MessageSquarePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Props {
   current: number;
@@ -29,12 +25,7 @@ export function SlideNav({ current, total, onPrev, onNext, commentCount = 0, onS
       <div className="flex items-center justify-between px-6 py-3">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              onClick={onPrev}
-              disabled={isOverview}
-              size="sm"
-            >
+            <Button variant="outline" onClick={onPrev} disabled={isOverview} size="sm">
               ← Prev
             </Button>
           </TooltipTrigger>
@@ -47,12 +38,7 @@ export function SlideNav({ current, total, onPrev, onNext, commentCount = 0, onS
 
         <div className="flex items-center gap-2">
           {onSubmitReview && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onSubmitReview}
-              className="gap-1.5"
-            >
+            <Button variant="outline" size="sm" onClick={onSubmitReview} className="gap-1.5">
               <MessageSquarePlus className="h-3.5 w-3.5" />
               Submit review
               {commentCount > 0 && (
@@ -64,12 +50,7 @@ export function SlideNav({ current, total, onPrev, onNext, commentCount = 0, onS
           )}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                onClick={onNext}
-                disabled={current >= total}
-                size="sm"
-              >
+              <Button variant="outline" onClick={onNext} disabled={current >= total} size="sm">
                 Next →
               </Button>
             </TooltipTrigger>

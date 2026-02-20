@@ -149,19 +149,20 @@ export async function generateReviewGuide(
   instructions?: string,
   onChunk?: (chunk: string, isThinking: boolean) => void,
   thinking: boolean = false,
-  signalBoost: boolean = false,
+  signalBoost: boolean = false
 ): Promise<ReviewGuide> {
   const provider = getProvider(providerName);
 
   async function attempt(extraInstruction: string = ''): Promise<ReviewGuide> {
     const customInstructions = instructions?.trim();
     const userMessage = customInstructions
-      ? contextPackage + USER_SUFFIX + extraInstruction + `\n\n<reviewer_instructions>\nThe reviewer has provided custom instructions that MUST take priority over default style guidelines.\n${customInstructions}\n</reviewer_instructions>`
+      ? contextPackage +
+        USER_SUFFIX +
+        extraInstruction +
+        `\n\n<reviewer_instructions>\nThe reviewer has provided custom instructions that MUST take priority over default style guidelines.\n${customInstructions}\n</reviewer_instructions>`
       : contextPackage + USER_SUFFIX + extraInstruction;
 
-    const baseSystem = signalBoost
-      ? `${SIGNAL_BOOST_DIRECTIVE}\n${SYSTEM_PROMPT}`
-      : SYSTEM_PROMPT;
+    const baseSystem = signalBoost ? `${SIGNAL_BOOST_DIRECTIVE}\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
 
     const system = customInstructions
       ? `${baseSystem}\n\nIMPORTANT — CUSTOM REVIEWER INSTRUCTIONS:\nThe reviewer has provided the following instructions. These take precedence over the default writing style and tone guidelines above. Adapt your narrative, reviewFocus, summary, and all prose fields accordingly.\n\n<instructions>\n${customInstructions}\n</instructions>`
@@ -190,14 +191,16 @@ export async function generateReviewGuide(
       throw new Error('Response is missing required fields (prTitle, summary, riskLevel, slides)');
     }
 
-    (parsed as ReviewGuide).prUrl = prUrl;
-    return parsed as ReviewGuide;
+    parsed.prUrl = prUrl;
+    return parsed;
   }
 
   try {
     return await attempt();
   } catch (err) {
-    console.warn(`[agent] First attempt failed (${err instanceof Error ? err.message : 'unknown'}), retrying concisely`);
+    console.warn(
+      `[agent] First attempt failed (${err instanceof Error ? err.message : 'unknown'}), retrying concisely`
+    );
     try {
       return await attempt(CONCISE_SUFFIX);
     } catch (retryErr) {

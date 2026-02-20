@@ -50,7 +50,9 @@ export function PRSummaryBanner({ review }: Props) {
 
           <div className="text-xs text-muted-foreground">
             <span className="font-medium text-foreground">Risk rationale:</span>{' '}
-            <Markdown className="inline-block text-xs text-muted-foreground [&_p]:inline">{review.riskRationale}</Markdown>
+            <Markdown className="inline-block text-xs text-muted-foreground [&_p]:inline">
+              {review.riskRationale}
+            </Markdown>
           </div>
         </div>
       </CardContent>

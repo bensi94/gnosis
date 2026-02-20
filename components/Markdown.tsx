@@ -34,16 +34,14 @@ const components: Components = {
     const isBlock = className?.startsWith('language-');
     if (isBlock) {
       return (
-        <code className={`block bg-muted/50 rounded-md p-3 text-xs font-mono overflow-x-auto whitespace-pre mb-2 last:mb-0 ${className ?? ''}`}>
+        <code
+          className={`block bg-muted/50 rounded-md p-3 text-xs font-mono overflow-x-auto whitespace-pre mb-2 last:mb-0 ${className ?? ''}`}
+        >
           {children}
         </code>
       );
     }
-    return (
-      <code className="font-mono text-[0.85em] bg-muted/70 rounded px-1 py-0.5 text-foreground">
-        {children}
-      </code>
-    );
+    return <code className="font-mono text-[0.85em] bg-muted/70 rounded px-1 py-0.5 text-foreground">{children}</code>;
   },
   pre: ({ children }) => <>{children}</>,
   table: ({ children }) => (
@@ -54,9 +52,7 @@ const components: Components = {
   th: ({ children }) => (
     <th className="border border-border px-2 py-1 text-left font-medium bg-muted/30">{children}</th>
   ),
-  td: ({ children }) => (
-    <td className="border border-border px-2 py-1">{children}</td>
-  ),
+  td: ({ children }) => <td className="border border-border px-2 py-1">{children}</td>,
   hr: () => <hr className="border-border my-3" />,
 };
 

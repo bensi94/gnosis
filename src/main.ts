@@ -4,19 +4,19 @@ import fs from 'fs';
 import http from 'http';
 import crypto from 'crypto';
 import { Octokit } from '@octokit/rest';
-import {
-  parsePrUrl,
-  getPrMetadata,
-  getPrDiff,
-  getChangedFiles,
-  getFileContent,
-  getNeighborFiles,
-} from '../lib/github';
+import { parsePrUrl, getPrMetadata, getPrDiff, getChangedFiles, getFileContent, getNeighborFiles } from '../lib/github';
 import { buildContextPackage } from '../lib/context-builder';
 import { generateReviewGuide } from '../lib/agent';
 import { renderDiffHunk, inferLanguage } from '../lib/highlight';
 import { parsePatchValidLines } from '../lib/diff-lines';
-import type { GenerateReviewRequest, ModelId, ReviewGuide, ReviewHistoryEntry, SubmitReviewRequest, FreshnessResult } from '../lib/types';
+import type {
+  GenerateReviewRequest,
+  ModelId,
+  ReviewGuide,
+  ReviewHistoryEntry,
+  SubmitReviewRequest,
+  FreshnessResult,
+} from '../lib/types';
 
 // Injected by Electron Forge Vite plugin
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -123,6 +123,7 @@ function runOAuthFlow(): Promise<void> {
     const state = crypto.randomBytes(20).toString('hex');
     const { verifier, challenge } = generatePkce();
 
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- async HTTP handler
     const server = http.createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', `http://localhost`);
       if (url.pathname !== '/callback') {
@@ -171,7 +172,7 @@ function runOAuthFlow(): Promise<void> {
         res.writeHead(500, { 'Content-Type': 'text/html' });
         res.end('<html><body><p>Authentication failed. Please try again.</p></body></html>');
         server.close();
-        reject(err);
+        reject(err instanceof Error ? err : new Error(String(err)));
       }
     });
 
@@ -193,13 +194,16 @@ function runOAuthFlow(): Promise<void> {
         code_challenge: challenge,
         code_challenge_method: 'S256',
       });
-      shell.openExternal(`https://github.com/login/oauth/authorize?${params}`);
+      void shell.openExternal(`https://github.com/login/oauth/authorize?${params}`);
     });
 
-    const timeout = setTimeout(() => {
-      server.close();
-      reject(new Error('OAuth sign-in timed out after 5 minutes'));
-    }, 5 * 60 * 1000);
+    const timeout = setTimeout(
+      () => {
+        server.close();
+        reject(new Error('OAuth sign-in timed out after 5 minutes'));
+      },
+      5 * 60 * 1000
+    );
 
     server.on('close', () => clearTimeout(timeout));
   });
@@ -221,15 +225,13 @@ function createWindow() {
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
+    void mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 }
 
-app.whenReady().then(() => {
+void app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -257,7 +259,7 @@ function ensureReviewsDir() {
 
 function readReviewsIndex(): ReviewHistoryEntry[] {
   try {
-    return JSON.parse(fs.readFileSync(getReviewsIndexPath(), 'utf-8'));
+    return JSON.parse(fs.readFileSync(getReviewsIndexPath(), 'utf-8')) as ReviewHistoryEntry[];
   } catch {
     return [];
   }
@@ -268,10 +270,7 @@ function saveReviewToHistory(review: ReviewGuide, model?: ModelId): void {
   const id = Date.now().toString();
   const savedAt = new Date().toISOString();
 
-  fs.writeFileSync(
-    path.join(getReviewsDir(), `${id}.json`),
-    JSON.stringify(review),
-  );
+  fs.writeFileSync(path.join(getReviewsDir(), `${id}.json`), JSON.stringify(review));
 
   const entry: ReviewHistoryEntry = {
     id,
@@ -291,7 +290,7 @@ function saveReviewToHistory(review: ReviewGuide, model?: ModelId): void {
 // ── IPC handlers ────────────────────────────────────────────────
 
 // Backward-compat shim — renderer still calls getConfig to check if signed in
-ipcMain.handle('get-config', async () => {
+ipcMain.handle('get-config', () => {
   const token = getResolvedToken();
   return { githubToken: token };
 });
@@ -316,175 +315,188 @@ ipcMain.handle('get-auth-state', async () => {
   return { authenticated: true, login: cachedLogin };
 });
 
-ipcMain.handle('sign-out', async () => {
+ipcMain.handle('sign-out', () => {
   cachedToken = null;
   cachedLogin = null;
   deleteStoredToken();
 });
 
-ipcMain.handle('list-reviews', async () => {
+ipcMain.handle('list-reviews', () => {
   return readReviewsIndex();
 });
 
-ipcMain.handle('load-review', async (_event, id: string) => {
+ipcMain.handle('load-review', (_event, id: string) => {
   const filePath = path.join(getReviewsDir(), `${id}.json`);
   return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as ReviewGuide;
 });
 
-ipcMain.handle('delete-review', async (_event, id: string) => {
+ipcMain.handle('delete-review', (_event, id: string) => {
   const filePath = path.join(getReviewsDir(), `${id}.json`);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   const index = readReviewsIndex().filter((e) => e.id !== id);
   fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
 });
 
-ipcMain.handle('check-pr-freshness', async (_event, prUrl: string, headSha: string | undefined): Promise<FreshnessResult> => {
-  if (!headSha) {
-    return { status: 'unknown', reason: 'Review has no stored head SHA' };
-  }
-
-  const token = getResolvedToken();
-  const octokit = new Octokit({ auth: token ?? undefined });
-  const { owner, repo, pullNumber } = parsePrUrl(prUrl);
-
-  try {
-    const prData = await getPrMetadata(octokit, owner, repo, pullNumber);
-    const currentSha = prData.headSha;
-
-    if (currentSha === headSha) {
-      return { status: 'current' };
+ipcMain.handle(
+  'check-pr-freshness',
+  async (_event, prUrl: string, headSha: string | undefined): Promise<FreshnessResult> => {
+    if (!headSha) {
+      return { status: 'unknown', reason: 'Review has no stored head SHA' };
     }
+
+    const token = getResolvedToken();
+    const octokit = new Octokit({ auth: token ?? undefined });
+    const { owner, repo, pullNumber } = parsePrUrl(prUrl);
 
     try {
-      const { data } = await octokit.repos.compareCommits({
-        owner,
-        repo,
-        base: headSha,
-        head: currentSha,
-      });
+      const prData = await getPrMetadata(octokit, owner, repo, pullNumber);
+      const currentSha = prData.headSha;
 
-      const commits = (data.commits ?? []).slice(0, 50).map((c) => ({
-        sha: c.sha,
-        message: (c.commit.message ?? '').split('\n')[0],
-        authorLogin: c.author?.login ?? c.commit.author?.name ?? 'unknown',
-        authorDate: c.commit.author?.date ?? '',
-      }));
-
-      return {
-        status: 'stale',
-        aheadBy: data.ahead_by ?? commits.length,
-        commits,
-      };
-    } catch (compareErr: unknown) {
-      const status = (compareErr as { status?: number })?.status;
-      if (status === 404) {
-        return { status: 'force-pushed' };
+      if (currentSha === headSha) {
+        return { status: 'current' };
       }
-      throw compareErr;
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return { status: 'unknown', reason: message };
-  }
-});
 
-ipcMain.handle('generate-review', async (_event, { prUrl, provider, model, instructions, thinking, signalBoost, smartImports }: GenerateReviewRequest) => {
-  const token = getResolvedToken();
-  const octokit = new Octokit({ auth: token ?? undefined });
-
-  const { owner, repo, pullNumber } = parsePrUrl(prUrl);
-
-  const [prData, diff, changedFiles] = await Promise.all([
-    getPrMetadata(octokit, owner, repo, pullNumber),
-    getPrDiff(octokit, owner, repo, pullNumber),
-    getChangedFiles(octokit, owner, repo, pullNumber),
-  ]);
-
-  if (changedFiles.length === 0) {
-    throw new Error('PR has no changed files');
-  }
-
-  const baseRef = prData.baseBranch;
-  const headRef = prData.headSha;
-
-  const fileContents: Record<string, string> = {};
-  const headFileContents: Record<string, string> = {};
-  const concurrency = 5;
-  const filesToFetch = changedFiles.filter((f) => f.status !== 'deleted');
-  const filesToFetchBase = changedFiles.filter((f) => f.status !== 'added');
-
-  for (let i = 0; i < Math.max(filesToFetch.length, filesToFetchBase.length); i += concurrency) {
-    const headBatch = filesToFetch.slice(i, i + concurrency);
-    const baseBatch = filesToFetchBase.slice(i, i + concurrency);
-    await Promise.all([
-      ...headBatch.map(async (f) => {
-        const content = await getFileContent(octokit, owner, repo, f.filename, headRef);
-        if (content !== null) headFileContents[f.filename] = content;
-      }),
-      ...baseBatch.map(async (f) => {
-        const content = await getFileContent(octokit, owner, repo, f.filename, baseRef);
-        if (content !== null) fileContents[f.filename] = content;
-      }),
-    ]);
-  }
-
-  const allFileContents = { ...fileContents, ...headFileContents };
-  const neighborFiles = await getNeighborFiles(
-    octokit,
-    owner,
-    repo,
-    changedFiles.map((f) => f.filename),
-    allFileContents,
-    baseRef,
-    smartImports ? provider : undefined,
-  );
-
-  const contextPackage = buildContextPackage(
-    prData,
-    diff,
-    changedFiles,
-    fileContents,
-    headFileContents,
-    neighborFiles,
-  );
-
-  console.log('[main] Generating review guide...');
-  const reviewGuide = await generateReviewGuide(
-    contextPackage, prUrl, provider, model, instructions,
-    (chunk, isThinking) => _event.sender.send('review-progress', { chunk, isThinking }),
-    thinking ?? false,
-    signalBoost ?? false,
-  );
-
-  reviewGuide.prTitle = reviewGuide.prTitle || prData.title;
-  reviewGuide.prDescription = reviewGuide.prDescription || prData.description;
-  reviewGuide.author = reviewGuide.author || prData.author;
-  reviewGuide.prUrl = prUrl;
-  reviewGuide.headSha = prData.headSha;
-  reviewGuide.totalFilesChanged = changedFiles.length;
-  reviewGuide.totalLinesChanged = changedFiles.reduce(
-    (sum, f) => sum + f.additions + f.deletions,
-    0,
-  );
-  reviewGuide.neighborFileCount = Object.keys(neighborFiles).length;
-
-  for (const slide of reviewGuide.slides) {
-    for (const hunk of slide.diffHunks) {
-      if (!hunk.language) {
-        hunk.language = inferLanguage(hunk.filePath);
-      }
       try {
-        hunk.renderedHtml = await renderDiffHunk(hunk.content, hunk.language);
-      } catch (err) {
-        console.warn(`[main] Failed to render hunk for ${hunk.filePath}:`, err);
-        hunk.renderedHtml = `<pre class="diff-block">${hunk.content}</pre>`;
+        const { data } = await octokit.repos.compareCommits({
+          owner,
+          repo,
+          base: headSha,
+          head: currentSha,
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- GitHub API defensive
+        const commits = (data.commits ?? []).slice(0, 50).map((c) => ({
+          sha: c.sha,
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- GitHub API defensive
+          message: (c.commit.message ?? '').split('\n')[0],
+          authorLogin: c.author?.login ?? c.commit.author?.name ?? 'unknown',
+          authorDate: c.commit.author?.date ?? '',
+        }));
+
+        return {
+          status: 'stale',
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- GitHub API defensive
+          aheadBy: data.ahead_by ?? commits.length,
+          commits,
+        };
+      } catch (compareErr: unknown) {
+        const status = (compareErr as { status?: number }).status;
+        if (status === 404) {
+          return { status: 'force-pushed' };
+        }
+        throw compareErr;
       }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return { status: 'unknown', reason: message };
     }
   }
+);
 
-  saveReviewToHistory(reviewGuide, model);
-  return reviewGuide;
-});
+ipcMain.handle(
+  'generate-review',
+  async (
+    _event,
+    { prUrl, provider, model, instructions, thinking, signalBoost, smartImports }: GenerateReviewRequest
+  ) => {
+    const token = getResolvedToken();
+    const octokit = new Octokit({ auth: token ?? undefined });
+
+    const { owner, repo, pullNumber } = parsePrUrl(prUrl);
+
+    const [prData, diff, changedFiles] = await Promise.all([
+      getPrMetadata(octokit, owner, repo, pullNumber),
+      getPrDiff(octokit, owner, repo, pullNumber),
+      getChangedFiles(octokit, owner, repo, pullNumber),
+    ]);
+
+    if (changedFiles.length === 0) {
+      throw new Error('PR has no changed files');
+    }
+
+    const baseRef = prData.baseBranch;
+    const headRef = prData.headSha;
+
+    const fileContents: Record<string, string> = {};
+    const headFileContents: Record<string, string> = {};
+    const concurrency = 5;
+    const filesToFetch = changedFiles.filter((f) => f.status !== 'deleted');
+    const filesToFetchBase = changedFiles.filter((f) => f.status !== 'added');
+
+    for (let i = 0; i < Math.max(filesToFetch.length, filesToFetchBase.length); i += concurrency) {
+      const headBatch = filesToFetch.slice(i, i + concurrency);
+      const baseBatch = filesToFetchBase.slice(i, i + concurrency);
+      await Promise.all([
+        ...headBatch.map(async (f) => {
+          const content = await getFileContent(octokit, owner, repo, f.filename, headRef);
+          if (content !== null) headFileContents[f.filename] = content;
+        }),
+        ...baseBatch.map(async (f) => {
+          const content = await getFileContent(octokit, owner, repo, f.filename, baseRef);
+          if (content !== null) fileContents[f.filename] = content;
+        }),
+      ]);
+    }
+
+    const allFileContents = { ...fileContents, ...headFileContents };
+    const neighborFiles = await getNeighborFiles(
+      octokit,
+      owner,
+      repo,
+      changedFiles.map((f) => f.filename),
+      allFileContents,
+      baseRef,
+      smartImports ? provider : undefined
+    );
+
+    const contextPackage = buildContextPackage(
+      prData,
+      diff,
+      changedFiles,
+      fileContents,
+      headFileContents,
+      neighborFiles
+    );
+
+    console.log('[main] Generating review guide...');
+    const reviewGuide = await generateReviewGuide(
+      contextPackage,
+      prUrl,
+      provider,
+      model,
+      instructions,
+      (chunk, isThinking) => _event.sender.send('review-progress', { chunk, isThinking }),
+      thinking ?? false,
+      signalBoost ?? false
+    );
+
+    reviewGuide.prTitle = reviewGuide.prTitle || prData.title;
+    reviewGuide.prDescription = reviewGuide.prDescription || prData.description;
+    reviewGuide.author = reviewGuide.author || prData.author;
+    reviewGuide.prUrl = prUrl;
+    reviewGuide.headSha = prData.headSha;
+    reviewGuide.totalFilesChanged = changedFiles.length;
+    reviewGuide.totalLinesChanged = changedFiles.reduce((sum, f) => sum + f.additions + f.deletions, 0);
+    reviewGuide.neighborFileCount = Object.keys(neighborFiles).length;
+
+    for (const slide of reviewGuide.slides) {
+      for (const hunk of slide.diffHunks) {
+        if (!hunk.language) {
+          hunk.language = inferLanguage(hunk.filePath);
+        }
+        try {
+          hunk.renderedHtml = await renderDiffHunk(hunk.content, hunk.language);
+        } catch (err) {
+          console.warn(`[main] Failed to render hunk for ${hunk.filePath}:`, err);
+          hunk.renderedHtml = `<pre class="diff-block">${hunk.content}</pre>`;
+        }
+      }
+    }
+
+    saveReviewToHistory(reviewGuide, model);
+    return reviewGuide;
+  }
+);
 
 ipcMain.handle('submit-review', async (_event, req: SubmitReviewRequest) => {
   const token = getResolvedToken();
@@ -526,9 +538,7 @@ ipcMain.handle('submit-review', async (_event, req: SubmitReviewRequest) => {
   // If some comments can't be posted inline, append them to the review body
   let reviewBody = req.body;
   if (droppedComments.length > 0) {
-    const droppedText = droppedComments
-      .map((c) => `**${c.path}:${c.line}** — ${c.body}`)
-      .join('\n\n');
+    const droppedText = droppedComments.map((c) => `**${c.path}:${c.line}** — ${c.body}`).join('\n\n');
     const suffix = `\n\n---\n_${droppedComments.length} comment(s) could not be posted inline (lines outside the diff range):_\n\n${droppedText}`;
     reviewBody = (reviewBody || '') + suffix;
   }

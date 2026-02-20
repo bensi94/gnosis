@@ -12,12 +12,12 @@ interface Props {
 
 const slideTypeConfig: Record<SlideType, { label: string; className: string }> = {
   foundation: { label: 'Foundation', className: 'bg-purple-900 text-purple-200 border-purple-700' },
-  feature:    { label: 'Feature',    className: 'bg-blue-900 text-blue-200 border-blue-700' },
-  refactor:   { label: 'Refactor',   className: 'bg-orange-900 text-orange-200 border-orange-700' },
-  bugfix:     { label: 'Bug Fix',    className: 'bg-red-900 text-red-200 border-red-700' },
-  test:       { label: 'Test',       className: 'bg-green-900 text-green-200 border-green-700' },
-  config:     { label: 'Config',     className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
-  docs:       { label: 'Docs',       className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
+  feature: { label: 'Feature', className: 'bg-blue-900 text-blue-200 border-blue-700' },
+  refactor: { label: 'Refactor', className: 'bg-orange-900 text-orange-200 border-orange-700' },
+  bugfix: { label: 'Bug Fix', className: 'bg-red-900 text-red-200 border-red-700' },
+  test: { label: 'Test', className: 'bg-green-900 text-green-200 border-green-700' },
+  config: { label: 'Config', className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
+  docs: { label: 'Docs', className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
 };
 
 export function OverviewSlide({ review, onNavigate }: Props) {
@@ -29,7 +29,8 @@ export function OverviewSlide({ review, onNavigate }: Props) {
         <Markdown className="text-base leading-relaxed">{review.summary}</Markdown>
         {(review.neighborFileCount ?? 0) > 0 && (
           <p className="text-xs text-muted-foreground">
-            {review.neighborFileCount} additional {review.neighborFileCount === 1 ? 'file' : 'files'} included for context
+            {review.neighborFileCount} additional {review.neighborFileCount === 1 ? 'file' : 'files'} included for
+            context
           </p>
         )}
       </div>
@@ -51,16 +52,14 @@ export function OverviewSlide({ review, onNavigate }: Props) {
           <CardContent className="p-0">
             <ol className="divide-y">
               {review.slides.map((slide) => {
-                const typeConfig = slideTypeConfig[slide.slideType] ?? slideTypeConfig.feature;
+                const typeConfig = slideTypeConfig[slide.slideType];
                 return (
                   <li key={slide.id}>
                     <button
                       onClick={() => onNavigate(slide.slideNumber)}
                       className="w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-muted/50 transition-colors"
                     >
-                      <span className="text-sm text-muted-foreground w-6 shrink-0 text-right">
-                        {slide.slideNumber}
-                      </span>
+                      <span className="text-sm text-muted-foreground w-6 shrink-0 text-right">{slide.slideNumber}</span>
                       <Badge variant="outline" className={`shrink-0 text-xs ${typeConfig.className}`}>
                         {typeConfig.label}
                       </Badge>

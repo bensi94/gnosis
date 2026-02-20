@@ -24,10 +24,12 @@ export async function getPrMetadata(
   return {
     title: data.title,
     description: data.body ?? '',
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- GitHub API can return null
     author: data.user?.login ?? 'unknown',
     baseBranch: data.base.ref,
     headBranch: data.head.ref,
     headSha: data.head.sha,
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- GitHub API can return null
     merged: data.merged ?? false,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
@@ -35,12 +37,7 @@ export async function getPrMetadata(
   };
 }
 
-export async function getPrDiff(
-  octokit: Octokit,
-  owner: string,
-  repo: string,
-  pullNumber: number
-): Promise<string> {
+export async function getPrDiff(octokit: Octokit, owner: string, repo: string, pullNumber: number): Promise<string> {
   const response = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
     owner,
     repo,
@@ -60,6 +57,7 @@ export async function getChangedFiles(
 ): Promise<ChangedFile[]> {
   const files: ChangedFile[] = [];
   let page = 1;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- pagination loop
   while (true) {
     const { data } = await octokit.pulls.listFiles({
       owner,
@@ -148,7 +146,7 @@ Rules:
 async function extractImportsWithLLM(
   changedFileContents: Record<string, string>,
   changedFilePaths: string[],
-  providerName: Provider,
+  providerName: Provider
 ): Promise<string[]> {
   const fileEntries = changedFilePaths
     .filter((p) => changedFileContents[p])
@@ -173,7 +171,7 @@ async function extractImportsWithLLM(
     const end = result.lastIndexOf(']');
     if (start === -1 || end <= start) return [];
 
-    const parsed = JSON.parse(result.slice(start, end + 1));
+    const parsed: unknown = JSON.parse(result.slice(start, end + 1));
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((p): p is string => typeof p === 'string');
   } catch (err) {
@@ -189,7 +187,7 @@ export async function getNeighborFiles(
   changedFilePaths: string[],
   changedFileContents: Record<string, string>,
   ref: string,
-  smartImportsProvider?: Provider,
+  smartImportsProvider?: Provider
 ): Promise<Record<string, string>> {
   if (smartImportsProvider) {
     console.log(`[github] Using smart (${smartImportsProvider}) import extraction`);
@@ -211,7 +209,7 @@ export async function getNeighborFiles(
           if (content !== null) {
             results[filePath] = content;
           }
-        }),
+        })
       );
     }
     console.log(`[github] Fetched ${Object.keys(results).length} neighbor file(s):`, Object.keys(results));
@@ -227,9 +225,7 @@ export async function getNeighborFiles(
 
     const imports = extractImports(content, filePath);
     for (const imp of imports) {
-      const alreadyChanged = changedFilePaths.some(
-        (p) => p === imp || TS_EXTENSIONS.some((ext) => p === imp + ext)
-      );
+      const alreadyChanged = changedFilePaths.some((p) => p === imp || TS_EXTENSIONS.some((ext) => p === imp + ext));
       if (!alreadyChanged) {
         neighborPaths.add(imp);
       }

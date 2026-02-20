@@ -1,4 +1,10 @@
-import type { GenerateReviewRequest, ReviewGuide, ReviewHistoryEntry, SubmitReviewRequest, FreshnessResult } from '../lib/types';
+import type {
+  GenerateReviewRequest,
+  ReviewGuide,
+  ReviewHistoryEntry,
+  SubmitReviewRequest,
+  FreshnessResult,
+} from '../lib/types';
 
 declare global {
   interface Window {

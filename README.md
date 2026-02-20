@@ -1,12 +1,12 @@
 # Gnosis
 
-*Gnosis* is an ancient Greek word for knowledge — not the surface kind, but the deep, direct understanding of something. The Gnostics used it to mean insight that comes from within, from truly comprehending a thing rather than just observing it from the outside. That's what's missing from most code reviews: you see the diff, but you don't get the understanding. Gnosis tries to close that gap — to give the reviewer not just the changes, but the story behind them.
+_Gnosis_ is an ancient Greek word for knowledge — not the surface kind, but the deep, direct understanding of something. The Gnostics used it to mean insight that comes from within, from truly comprehending a thing rather than just observing it from the outside. That's what's missing from most code reviews: you see the diff, but you don't get the understanding. Gnosis tries to close that gap — to give the reviewer not just the changes, but the story behind them.
 
 We've gotten fast at writing code. Reviewing it hasn't kept up.
 
 Pull requests are still reviewed the same way they always have been — scrolling through a list of file diffs in whatever order GitHub decides to show them, with no grouping, no context, and no sense of which changes depend on which. It works, but it's slow and it's easy to miss things.
 
-Gnosis is an experiment in changing that. Paste a PR URL and it reads the diff, groups related changes together, and presents them as an ordered slideshow — foundation changes first, then the features built on top, then tests and config. Each slide has a short explanation of *why* the change is there, the relevant diff, and optionally a diagram. The goal is to walk the reviewer through the change the way the author understands it, not the way the filesystem happens to order it.
+Gnosis is an experiment in changing that. Paste a PR URL and it reads the diff, groups related changes together, and presents them as an ordered slideshow — foundation changes first, then the features built on top, then tests and config. Each slide has a short explanation of _why_ the change is there, the relevant diff, and optionally a diagram. The goal is to walk the reviewer through the change the way the author understands it, not the way the filesystem happens to order it.
 
 It runs locally and uses Claude Code under the hood. Possibly Codex later.
 
@@ -41,7 +41,7 @@ On first launch, click **Connect GitHub** to authenticate via OAuth. Alternative
 1. Paste a GitHub PR URL
 2. Pick a model (Opus 4.6 or Sonnet 4.6)
 3. Optionally enable **Extended thinking** for more thorough analysis (slower)
-4. Optionally add custom instructions — e.g. *focus on security*, *explain the auth flow*
+4. Optionally add custom instructions — e.g. _focus on security_, _explain the auth flow_
 5. Hit **Generate Review**
 
 Navigate slides with **← →** or the Prev/Next buttons. Drag the divider between the narrative and diff panels to resize.
@@ -71,7 +71,6 @@ If a PR receives new commits after your review was generated, Gnosis shows a ban
 <img width="1224" height="1049" alt="image" src="https://github.com/user-attachments/assets/3bafb7f5-8b18-4349-801d-d0cf79519074" />
 
 <img width="1219" height="1050" alt="image" src="https://github.com/user-attachments/assets/686b0b3a-2f11-467b-9b6c-b84c69c50b91" />
-
 
 ## Development
 

@@ -16,9 +16,7 @@ export function DiffHunk({ hunk, showFileHeader = true }: Props) {
         </div>
       )}
       {hunk.hunkHeader && (
-        <div className="bg-muted/30 px-3 py-1 font-mono text-xs text-muted-foreground border-b">
-          {hunk.hunkHeader}
-        </div>
+        <div className="bg-muted/30 px-3 py-1 font-mono text-xs text-muted-foreground border-b">{hunk.hunkHeader}</div>
       )}
       <div dangerouslySetInnerHTML={{ __html: hunk.renderedHtml }} />
     </div>
@@ -33,9 +31,7 @@ interface GroupedProps {
 export function DiffHunkGroup({ filePath, hunks }: GroupedProps) {
   return (
     <div className="rounded-md border overflow-x-auto">
-      <div className="bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground border-b truncate">
-        {filePath}
-      </div>
+      <div className="bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground border-b truncate">{filePath}</div>
       {hunks.map((hunk, i) => (
         <div key={i}>
           {i > 0 && <div className="border-t border-dashed border-muted" />}

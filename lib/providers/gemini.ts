@@ -50,12 +50,7 @@ export const geminiProvider: LLMProvider = {
     await spawnCliStreaming({
       binPath: geminiPath,
       cliName: 'Gemini',
-      args: [
-        '-p', STDIN_PROMPT,
-        '-m', model,
-        '--output-format', 'stream-json',
-        '--sandbox',
-      ],
+      args: ['-p', STDIN_PROMPT, '-m', model, '--output-format', 'stream-json', '--sandbox'],
       stdinContent: systemPrompt + '\n\n' + content,
       processLine,
       installHint: INSTALL_HINT,
@@ -70,12 +65,7 @@ export const geminiProvider: LLMProvider = {
     return spawnCliQuick({
       binPath: geminiPath,
       cliName: 'Gemini',
-      args: [
-        '-p', STDIN_PROMPT,
-        '-m', model,
-        '--output-format', 'text',
-        '--sandbox',
-      ],
+      args: ['-p', STDIN_PROMPT, '-m', model, '--output-format', 'text', '--sandbox'],
       stdinContent: systemPrompt + '\n\n' + content,
       installHint: INSTALL_HINT,
       handleExitError: handleGeminiExitError,

@@ -38,7 +38,7 @@ export function useReviewComments() {
         comment: { id: crypto.randomUUID(), ...params },
       });
     },
-    [],
+    []
   );
 
   const removeComment = useCallback((id: string) => {

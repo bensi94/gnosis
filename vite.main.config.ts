@@ -12,15 +12,12 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- loadEnv may return undefined
       __GH_CLIENT_SECRET__: JSON.stringify(env.GH_CLIENT_SECRET ?? ''),
     },
     build: {
       rollupOptions: {
-        external: [
-          'electron',
-          ...builtinModules,
-          ...builtinModules.map((m) => `node:${m}`),
-        ],
+        external: ['electron', ...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
       },
     },
   };

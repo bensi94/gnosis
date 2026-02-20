@@ -24,14 +24,18 @@ export function resolveBinaryPath(name: string, extraCandidates: string[] = []):
       const raw = execFileSync('where.exe', [name], { encoding: 'utf-8', timeout: 5000 });
       const result = raw.trim().split('\n')[0].trim();
       if (result) return cacheAndReturn(name, result);
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   } else {
     for (const shell of ['/bin/zsh', '/bin/bash']) {
       if (!fs.existsSync(shell)) continue;
       try {
         const result = execFileSync(shell, ['-lc', `which ${name}`], { encoding: 'utf-8', timeout: 5000 }).trim();
         if (result) return cacheAndReturn(name, result);
-      } catch { /* try next */ }
+      } catch {
+        /* try next */
+      }
     }
   }
 
@@ -82,9 +86,7 @@ export function spawnCliStreaming(opts: StreamingCliOptions): Promise<void> {
 
     proc.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'ENOENT') {
-        reject(new Error(
-          `${opts.cliName} CLI not found at "${opts.binPath}". ${opts.installHint}`,
-        ));
+        reject(new Error(`${opts.cliName} CLI not found at "${opts.binPath}". ${opts.installHint}`));
       } else {
         reject(err);
       }
@@ -109,7 +111,9 @@ export function spawnCliStreaming(opts: StreamingCliOptions): Promise<void> {
       const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
       console.log(`${tag} +${elapsed}s streaming...`);
     });
-    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+    proc.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
 
     proc.stdin.write(opts.stdinContent);
     proc.stdin.end();
@@ -123,7 +127,7 @@ export function spawnCliStreaming(opts: StreamingCliOptions): Promise<void> {
         resolve();
       } else {
         const custom = opts.handleExitError?.(stderr);
-        reject(custom ?? new Error(`${opts.cliName} CLI exited with code ${code}: ${stderr.slice(0, 300)}`));
+        reject(custom ?? new Error(`${opts.cliName} CLI exited with code ${String(code)}: ${stderr.slice(0, 300)}`));
       }
     });
   });
@@ -149,9 +153,7 @@ export function spawnCliQuick(opts: QuickCliOptions): Promise<string> {
 
     proc.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'ENOENT') {
-        reject(new Error(
-          `${opts.cliName} CLI not found at "${opts.binPath}". ${opts.installHint}`,
-        ));
+        reject(new Error(`${opts.cliName} CLI not found at "${opts.binPath}". ${opts.installHint}`));
       } else {
         reject(err);
       }
@@ -160,8 +162,12 @@ export function spawnCliQuick(opts: QuickCliOptions): Promise<string> {
     let stdout = '';
     let stderr = '';
 
-    proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
-    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+    proc.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    proc.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
 
     proc.stdin.write(opts.stdinContent);
     proc.stdin.end();
@@ -171,7 +177,7 @@ export function spawnCliQuick(opts: QuickCliOptions): Promise<string> {
         resolve(stdout.trim());
       } else {
         const custom = opts.handleExitError?.(stderr);
-        reject(custom ?? new Error(`${opts.cliName} CLI exited with code ${code}: ${stderr.slice(0, 300)}`));
+        reject(custom ?? new Error(`${opts.cliName} CLI exited with code ${String(code)}: ${stderr.slice(0, 300)}`));
       }
     });
   });

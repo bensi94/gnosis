@@ -10,11 +10,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: [
-        'electron',
-        ...builtinModules,
-        ...builtinModules.map((m) => `node:${m}`),
-      ],
+      external: ['electron', ...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
     },
   },
 });
