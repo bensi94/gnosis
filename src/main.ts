@@ -265,18 +265,28 @@ async function runUpdateCheck() {
   }
 }
 
+let updateInterval: ReturnType<typeof setInterval> | null = null;
+
+function startUpdateChecks() {
+  setTimeout(() => void runUpdateCheck(), 5_000);
+  updateInterval = setInterval(() => void runUpdateCheck(), 4 * 60 * 60 * 1_000);
+}
+
 void app.whenReady().then(() => {
   createWindow();
+  startUpdateChecks();
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (!updateInterval) startUpdateChecks();
   });
-
-  // Check for updates after 5s, then every 4 hours
-  setTimeout(() => void runUpdateCheck(), 5_000);
-  setInterval(() => void runUpdateCheck(), 4 * 60 * 60 * 1_000);
 });
 
 app.on('window-all-closed', () => {
+  if (updateInterval) {
+    clearInterval(updateInterval);
+    updateInterval = null;
+  }
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -363,7 +373,13 @@ ipcMain.handle('dismiss-update', (_event, version: string) => {
 });
 
 ipcMain.handle('open-external', (_event, url: string) => {
-  void shell.openExternal(url);
+  try {
+    if (new URL(url).protocol === 'https:') {
+      void shell.openExternal(url);
+    }
+  } catch {
+    // invalid URL — ignore
+  }
 });
 
 // Backward-compat shim — renderer still calls getConfig to check if signed in

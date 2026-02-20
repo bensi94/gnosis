@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowUpCircle, X, Copy, Check, Download } from 'lucide-react';
 import type { UpdateInfo } from '../lib/types';
 
@@ -14,30 +14,28 @@ export function UpdateBanner() {
     return () => window.electronAPI.offUpdateAvailable();
   }, []);
 
-  const handleDismiss = useCallback((version: string) => {
+  if (!update) return null;
+
+  const { version, releaseUrl } = update;
+
+  function handleDismiss() {
     void window.electronAPI.dismissUpdate(version);
     setUpdate(null);
-  }, []);
+  }
 
-  const handleCopy = useCallback(() => {
+  function handleCopy() {
     void navigator.clipboard.writeText(BREW_COMMAND).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
-  }, []);
-
-  const handleDownload = useCallback((url: string) => {
-    void window.electronAPI.openExternal(url);
-  }, []);
-
-  if (!update) return null;
+  }
 
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2 text-sm updateBanner">
       <div className="flex items-center gap-2">
         <ArrowUpCircle className="h-4 w-4 shrink-0" />
         <span>
-          Gnosis <strong>v{update.version}</strong> is available
+          Gnosis <strong>v{version}</strong> is available
         </span>
         {isMac ? (
           <>
@@ -52,7 +50,7 @@ export function UpdateBanner() {
           </>
         ) : (
           <button
-            onClick={() => handleDownload(update.releaseUrl)}
+            onClick={() => void window.electronAPI.openExternal(releaseUrl)}
             className="ml-1 inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors updateBanner-btn"
           >
             <Download className="h-3 w-3" />
@@ -60,7 +58,7 @@ export function UpdateBanner() {
           </button>
         )}
       </div>
-      <button onClick={() => handleDismiss(update.version)} className="shrink-0 transition-opacity hover:opacity-80">
+      <button onClick={handleDismiss} className="shrink-0 transition-opacity hover:opacity-80">
         <X className="h-3.5 w-3.5" />
       </button>
     </div>

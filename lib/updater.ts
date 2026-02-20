@@ -3,8 +3,6 @@ import type { UpdateInfo } from './types';
 interface GitHubRelease {
   tag_name: string;
   html_url: string;
-  name: string;
-  published_at: string;
 }
 
 /** Compare two semver strings. Returns true if remote > local. */
@@ -35,8 +33,6 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     return {
       version: remoteVersion,
       releaseUrl: data.html_url,
-      releaseName: data.name || `v${remoteVersion}`,
-      publishedAt: data.published_at,
     };
   } catch {
     return null;

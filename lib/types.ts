@@ -173,8 +173,6 @@ export interface PrSearchResult {
 export interface UpdateInfo {
   version: string;
   releaseUrl: string;
-  releaseName: string;
-  publishedAt: string;
 }
 
 export interface PrMetadata {
