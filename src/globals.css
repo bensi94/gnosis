@@ -12,6 +12,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -51,9 +52,9 @@
 }
 
 :root {
-  /* System font stack (replaces Next.js Geist fonts) */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
 
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -96,8 +97,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.65 0.15 195);
+  --primary-foreground: oklch(0.13 0.02 195);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -107,7 +108,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.55 0.12 195);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -115,22 +116,47 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(0.65 0.15 195);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --accent-glow: oklch(0.65 0.15 195 / 30%);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-color: oklch(0.35 0 0) transparent;
   }
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
   }
+}
+
+/* ─── Dark scrollbars (WebKit) ───────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0 0);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.45 0 0);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ─── Shiki base ─────────────────────────────────────────────── */
@@ -215,4 +241,203 @@
 
 .line.interactive-line {
   padding-left: 0 !important;
+}
+
+/* ─── Freshness banner ────────────────────────────────────────── */
+
+.staleBanner-current {
+  border: 1px solid oklch(0.55 0.12 155 / 30%);
+  background: oklch(0.25 0.04 155 / 40%);
+  color: oklch(0.78 0.1 155);
+}
+
+.staleBanner-unknown {
+  border: 1px solid oklch(0.45 0 0 / 40%);
+  background: oklch(0.22 0 0 / 50%);
+  color: oklch(0.65 0 0);
+}
+
+.staleBanner-warn {
+  border: 1px solid oklch(0.55 0.12 75 / 40%);
+  background: oklch(0.25 0.05 75 / 40%);
+  color: oklch(0.82 0.1 80);
+}
+
+.staleBanner-warn-toggle:hover {
+  color: oklch(0.9 0.1 80);
+}
+
+.staleBanner-warn-btn {
+  border: 1px solid oklch(0.5 0.1 75 / 40%);
+  background: oklch(0.3 0.06 75 / 50%);
+  color: oklch(0.82 0.1 80);
+}
+
+.staleBanner-warn-btn:hover {
+  background: oklch(0.35 0.08 75 / 55%);
+}
+
+.staleBanner-warn-list {
+  border-top: 1px solid oklch(0.5 0.1 75 / 20%);
+}
+
+.staleBanner-warn-sha {
+  color: oklch(0.72 0.08 80 / 70%);
+}
+
+.staleBanner-warn-meta {
+  color: oklch(0.72 0.08 80 / 50%);
+}
+
+/* ─── PR status pills ─────────────────────────────────────────── */
+
+.statusPill-green,
+.statusPill-red,
+.statusPill-amber,
+.statusPill-neutral,
+.statusPill-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.statusPill-green {
+  border: 1px solid oklch(0.55 0.12 155 / 40%);
+  background: oklch(0.25 0.04 155 / 40%);
+  color: oklch(0.78 0.1 155);
+}
+
+.statusPill-red {
+  border: 1px solid oklch(0.55 0.15 25 / 40%);
+  background: oklch(0.25 0.05 25 / 40%);
+  color: oklch(0.78 0.12 25);
+}
+
+.statusPill-amber {
+  border: 1px solid oklch(0.55 0.12 75 / 40%);
+  background: oklch(0.25 0.05 75 / 40%);
+  color: oklch(0.82 0.1 80);
+}
+
+.statusPill-neutral {
+  border: 1px solid oklch(0.45 0 0 / 30%);
+  background: oklch(0.22 0 0 / 40%);
+  color: oklch(0.65 0 0);
+}
+
+.statusPill-label {
+  border: 1px solid oklch(0.5 0.08 260 / 35%);
+  background: oklch(0.25 0.03 260 / 40%);
+  color: oklch(0.75 0.06 260);
+}
+
+.statusPill-skeleton {
+  border: 1px solid oklch(0.35 0 0 / 20%);
+  background: oklch(0.22 0 0 / 50%);
+}
+
+/* ─── Review focus callout ────────────────────────────────────── */
+
+.review-focus-content ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.review-focus-content ul > li {
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.review-focus-content ul > li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: var(--primary);
+  opacity: 0.7;
+  font-size: 0.875rem;
+  line-height: inherit;
+}
+
+/* ─── Slide transitions (Priority 3) ─────────────────────────── */
+
+@keyframes slide-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-enter {
+  animation: slide-enter 0.25s ease-out;
+}
+
+/* ─── Entrance animations (Priority 5) ────────────────────────── */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out both;
+}
+
+/* ─── Hero glow (Priority 7) ──────────────────────────────────── */
+
+.hero-glow {
+  position: relative;
+}
+
+.hero-glow::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 600px;
+  background: radial-gradient(ellipse, oklch(0.65 0.15 195 / 15%) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Loading screen rings (Priority 4) ──────────────────────── */
+
+@keyframes pulse-ring {
+  0% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+.loading-ring {
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+.loading-ring-delayed {
+  animation: pulse-ring 2s ease-out 0.5s infinite;
+}
+
+.loading-ring-delayed-2 {
+  animation: pulse-ring 2s ease-out 1s infinite;
 }

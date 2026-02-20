@@ -1,11 +1,13 @@
 import { createHighlighter, type Highlighter, type ShikiTransformer } from 'shiki';
+import { CODE_THEMES } from './constants';
+import type { ReviewGuide } from './types';
 
 let highlighterInstance: Highlighter | null = null;
 
 async function getHighlighter(): Promise<Highlighter> {
   if (!highlighterInstance) {
     highlighterInstance = await createHighlighter({
-      themes: ['github-dark'],
+      themes: CODE_THEMES.map((t) => t.id),
       langs: [
         'typescript',
         'javascript',
@@ -75,7 +77,7 @@ const SUPPORTED_LANGUAGES = new Set([
  * we track the diff type for each line by position and apply classes directly
  * via a custom ShikiTransformer. This works for every language.
  */
-export async function renderDiffHunk(content: string, language: string): Promise<string> {
+export async function renderDiffHunk(content: string, language: string, theme = 'aurora-x'): Promise<string> {
   const highlighter = await getHighlighter();
   const lang = SUPPORTED_LANGUAGES.has(language) ? language : 'text';
 
@@ -107,7 +109,7 @@ export async function renderDiffHunk(content: string, language: string): Promise
 
   return highlighter.codeToHtml(codeLines.join('\n'), {
     lang,
-    theme: 'github-dark',
+    theme,
     transformers: [diffTransformer],
   });
 }
@@ -147,4 +149,16 @@ export function inferLanguage(filePath: string): string {
     php: 'php',
   };
   return map[ext ?? ''] ?? 'text';
+}
+
+export async function reRenderAllHunks(review: ReviewGuide, theme: string): Promise<void> {
+  for (const slide of review.slides) {
+    for (const hunk of slide.diffHunks) {
+      try {
+        hunk.renderedHtml = await renderDiffHunk(hunk.content, hunk.language, theme);
+      } catch (err) {
+        console.warn(`[highlight] Failed to re-render hunk for ${hunk.filePath}:`, err);
+      }
+    }
+  }
 }

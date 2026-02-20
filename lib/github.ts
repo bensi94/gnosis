@@ -1,6 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { getProvider } from './provider';
-import type { ChangedFile, PrMetadata, PrSearchResult, Provider } from './types';
+import type { ChangedFile, CiCheck, PrMetadata, PrSearchResult, Provider, ReviewSummary } from './types';
 
 export function parsePrUrl(url: string): { owner: string; repo: string; pullNumber: number } {
   const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/pulls?\/(\d+)/);
@@ -34,6 +34,17 @@ export async function getPrMetadata(
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     url: data.html_url,
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- GitHub API can return null
+    labels: (data.labels ?? []).map((l) => (typeof l === 'string' ? l : (l.name ?? ''))).filter(Boolean),
+    mergeable: data.mergeable ?? null,
+    isDraft: data.draft ?? false,
+    commitCount: data.commits,
+    requestedReviewers: (data.requested_reviewers ?? []).map((u) => u.login),
+    requestedTeams: (data.requested_teams ?? []).map((t) => t.name),
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- GitHub API can return null
+    mergeableState: data.mergeable_state ?? null,
+    autoMerge: data.auto_merge ? { method: data.auto_merge.merge_method } : null,
+    milestone: data.milestone ? { title: data.milestone.title, dueOn: data.milestone.due_on } : null,
   };
 }
 
@@ -148,6 +159,73 @@ export async function searchPullRequests(octokit: Octokit, login: string, limit 
   return Array.from(seen.values())
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, limit);
+}
+
+export async function getCiStatus(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  ref: string
+): Promise<{ checks: CiCheck[]; conclusion: 'success' | 'failure' | 'pending' | 'neutral' }> {
+  const { data } = await octokit.checks.listForRef({ owner, repo, ref, per_page: 100 });
+  const checks: CiCheck[] = data.check_runs.map((run) => ({
+    name: run.name,
+    status: run.status as CiCheck['status'],
+    conclusion: run.conclusion ?? null,
+  }));
+
+  let conclusion: 'success' | 'failure' | 'pending' | 'neutral' = 'success';
+  if (checks.length === 0) {
+    conclusion = 'neutral';
+  } else if (
+    checks.some((c) => c.conclusion === 'failure' || c.conclusion === 'timed_out' || c.conclusion === 'cancelled')
+  ) {
+    conclusion = 'failure';
+  } else if (checks.some((c) => c.status === 'in_progress' || c.status === 'queued')) {
+    conclusion = 'pending';
+  } else if (
+    checks.every((c) => c.conclusion === 'success' || c.conclusion === 'skipped' || c.conclusion === 'neutral')
+  ) {
+    conclusion = 'success';
+  } else {
+    conclusion = 'neutral';
+  }
+
+  return { checks, conclusion };
+}
+
+export async function getReviewStatus(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<ReviewSummary> {
+  const { data: reviews } = await octokit.pulls.listReviews({
+    owner,
+    repo,
+    pull_number: pullNumber,
+    per_page: 100,
+  });
+
+  // Keep only the latest review per reviewer
+  const latestByUser = new Map<string, string>();
+  for (const r of reviews) {
+    const login = r.user?.login ?? 'unknown';
+    const state = r.state;
+    if (state === 'DISMISSED' || state === 'PENDING') continue;
+    latestByUser.set(login, state);
+  }
+
+  let approved = 0;
+  let changesRequested = 0;
+  let commented = 0;
+  for (const state of latestByUser.values()) {
+    if (state === 'APPROVED') approved++;
+    else if (state === 'CHANGES_REQUESTED') changesRequested++;
+    else if (state === 'COMMENTED') commented++;
+  }
+
+  return { approved, changesRequested, commented };
 }
 
 function extractImports(content: string, filePath: string): string[] {

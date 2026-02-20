@@ -1,13 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TooltipProvider } from '../components/ui/tooltip';
 import { HomePage } from './pages/HomePage';
 import { ReviewPage } from './pages/ReviewPage';
+import { applyCodeFont } from '../components/SettingsDialog';
 import type { ReviewGuide } from '../lib/types';
 
 type Page = 'home' | 'review';
 
 export function App() {
   const [page, setPage] = useState<Page>('home');
+
+  useEffect(() => {
+    void window.electronAPI.loadPreferences().then((prefs) => {
+      if (prefs.codeFont) applyCodeFont(prefs.codeFont);
+    });
+  }, []);
   const [review, setReview] = useState<ReviewGuide | null>(null);
   const [prefillPrUrl, setPrefillPrUrl] = useState<string | undefined>();
 

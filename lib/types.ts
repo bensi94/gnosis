@@ -1,5 +1,17 @@
 export type SlideType = 'foundation' | 'feature' | 'refactor' | 'bugfix' | 'test' | 'config' | 'docs';
 
+export interface CiCheck {
+  name: string;
+  status: 'queued' | 'in_progress' | 'completed';
+  conclusion: string | null;
+}
+
+export interface ReviewSummary {
+  approved: number;
+  changesRequested: number;
+  commented: number;
+}
+
 export interface DiffHunk {
   filePath: string;
   hunkHeader: string;
@@ -36,6 +48,22 @@ export interface ReviewGuide {
   generationDurationMs?: number;
   slides: Slide[];
   headSha?: string;
+}
+
+export interface PrStatus {
+  labels: string[];
+  mergeable: boolean | null;
+  isDraft: boolean;
+  ciChecks: CiCheck[];
+  ciConclusion: 'success' | 'failure' | 'pending' | 'neutral';
+  reviewSummary: ReviewSummary;
+  baseBranch: string;
+  commitCount: number;
+  requestedReviewers: string[];
+  requestedTeams: string[];
+  mergeableState: string | null;
+  autoMerge: { method: string } | null;
+  milestone: { title: string; dueOn: string | null } | null;
 }
 
 export type DiffSide = 'LEFT' | 'RIGHT';
@@ -91,6 +119,8 @@ export interface Preferences {
   thinking: boolean;
   signalBoost: boolean;
   smartImports: boolean;
+  codeTheme: string;
+  codeFont: string;
 }
 
 export interface GenerateReviewRequest {
@@ -151,4 +181,13 @@ export interface PrMetadata {
   createdAt: string;
   updatedAt: string;
   url: string;
+  labels: string[];
+  mergeable: boolean | null;
+  isDraft: boolean;
+  commitCount: number;
+  requestedReviewers: string[];
+  requestedTeams: string[];
+  mergeableState: string | null;
+  autoMerge: { method: string } | null;
+  milestone: { title: string; dueOn: string | null } | null;
 }

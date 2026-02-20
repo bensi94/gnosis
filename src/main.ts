@@ -12,10 +12,13 @@ import {
   getFileContent,
   getNeighborFiles,
   searchPullRequests,
+  getCiStatus,
+  getReviewStatus,
 } from '../lib/github';
+import type { CiCheck, PrStatus } from '../lib/types';
 import { buildContextPackage } from '../lib/context-builder';
 import { generateReviewGuide } from '../lib/agent';
-import { renderDiffHunk, inferLanguage } from '../lib/highlight';
+import { renderDiffHunk, inferLanguage, reRenderAllHunks } from '../lib/highlight';
 import { parsePatchValidLines } from '../lib/diff-lines';
 import type {
   GenerateReviewRequest,
@@ -233,6 +236,12 @@ function createWindow() {
     console.error('[main] Renderer failed to load:', errorCode, errorDescription);
   });
 
+  // Open external links in the user's default browser instead of a new Electron window
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
@@ -310,6 +319,8 @@ const DEFAULT_PREFERENCES: Preferences = {
   thinking: true,
   signalBoost: true,
   smartImports: true,
+  codeTheme: 'aurora-x',
+  codeFont: 'jetbrains-mono',
 };
 
 function loadPreferences(): Preferences {
@@ -378,9 +389,18 @@ ipcMain.handle('list-reviews', () => {
   return readReviewsIndex();
 });
 
-ipcMain.handle('load-review', (_event, id: string) => {
-  const filePath = path.join(getReviewsDir(), `${id}.json`);
-  return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as ReviewGuide;
+ipcMain.handle('load-review', async (_event, id: string) => {
+  const reviewPath = path.join(getReviewsDir(), `${id}.json`);
+  const review = JSON.parse(fs.readFileSync(reviewPath, 'utf-8')) as ReviewGuide;
+  const prefs = loadPreferences();
+  await reRenderAllHunks(review, prefs.codeTheme);
+  return review;
+});
+
+ipcMain.handle('re-render-hunks', async (_event, review: ReviewGuide) => {
+  const prefs = loadPreferences();
+  await reRenderAllHunks(review, prefs.codeTheme);
+  return review;
 });
 
 ipcMain.handle('delete-review', (_event, id: string) => {
@@ -445,6 +465,38 @@ ipcMain.handle(
     }
   }
 );
+
+ipcMain.handle('get-pr-status', async (_event, prUrl: string): Promise<PrStatus> => {
+  const token = getResolvedToken();
+  const octokit = new Octokit({ auth: token ?? undefined });
+  const { owner, repo, pullNumber } = parsePrUrl(prUrl);
+
+  const [prData, reviewSummary] = await Promise.all([
+    getPrMetadata(octokit, owner, repo, pullNumber),
+    getReviewStatus(octokit, owner, repo, pullNumber),
+  ]);
+
+  const ciStatus = await getCiStatus(octokit, owner, repo, prData.headSha).catch(() => ({
+    checks: [] as CiCheck[],
+    conclusion: 'neutral' as const,
+  }));
+
+  return {
+    labels: prData.labels,
+    mergeable: prData.mergeable,
+    isDraft: prData.isDraft,
+    ciChecks: ciStatus.checks,
+    ciConclusion: ciStatus.conclusion,
+    reviewSummary,
+    baseBranch: prData.baseBranch,
+    commitCount: prData.commitCount,
+    requestedReviewers: prData.requestedReviewers,
+    requestedTeams: prData.requestedTeams,
+    mergeableState: prData.mergeableState,
+    autoMerge: prData.autoMerge,
+    milestone: prData.milestone,
+  };
+});
 
 ipcMain.handle(
   'generate-review',
@@ -536,13 +588,14 @@ ipcMain.handle(
     reviewGuide.neighborFileCount = Object.keys(neighborFiles).length;
     reviewGuide.generationDurationMs = generationDurationMs;
 
+    const codeTheme = loadPreferences().codeTheme;
     for (const slide of reviewGuide.slides) {
       for (const hunk of slide.diffHunks) {
         if (!hunk.language) {
           hunk.language = inferLanguage(hunk.filePath);
         }
         try {
-          hunk.renderedHtml = await renderDiffHunk(hunk.content, hunk.language);
+          hunk.renderedHtml = await renderDiffHunk(hunk.content, hunk.language, codeTheme);
         } catch (err) {
           console.warn(`[main] Failed to render hunk for ${hunk.filePath}:`, err);
           hunk.renderedHtml = `<pre class="diff-block">${hunk.content}</pre>`;

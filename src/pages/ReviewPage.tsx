@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { PRSummaryBanner } from '../../components/PRSummaryBanner';
 import { StaleBanner } from '../../components/StaleBanner';
 import { OverviewSlide } from '../../components/OverviewSlide';
 import { SlideView } from '../../components/SlideView';
 import { SlideNav } from '../../components/SlideNav';
 import { SubmitReviewDialog } from '../../components/SubmitReviewDialog';
+import { SettingsDialog } from '../../components/SettingsDialog';
 import { useReviewComments } from '../../lib/use-review-comments';
-import type { ReviewGuide, ReviewEvent, FreshnessResult } from '../../lib/types';
+import type { ReviewGuide, ReviewEvent, FreshnessResult, PrStatus } from '../../lib/types';
 
 interface Props {
   review: ReviewGuide;
@@ -14,11 +16,14 @@ interface Props {
   onReReview: (prUrl: string) => void;
 }
 
-export function ReviewPage({ review, onBack, onReReview }: Props) {
+export function ReviewPage({ review: initialReview, onBack, onReReview }: Props) {
+  const [review, setReview] = useState(initialReview);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [currentLogin, setCurrentLogin] = useState<string | null>(null);
   const [freshness, setFreshness] = useState<FreshnessResult | null>(null);
+  const [prStatus, setPrStatus] = useState<PrStatus | null>(null);
   const { comments, addComment, removeComment, editComment, clearAll } = useReviewComments();
 
   useEffect(() => {
@@ -30,6 +35,14 @@ export function ReviewPage({ review, onBack, onReReview }: Props) {
     void window.electronAPI.checkPrFreshness(review.prUrl, review.headSha).then((result) => {
       if (!cancelled) setFreshness(result);
     });
+    void window.electronAPI
+      .getPrStatus(review.prUrl)
+      .then((status) => {
+        if (!cancelled) setPrStatus(status);
+      })
+      .catch(() => {
+        /* token may be missing for loaded reviews */
+      });
     return () => {
       cancelled = true;
     };
@@ -85,9 +98,10 @@ export function ReviewPage({ review, onBack, onReReview }: Props) {
           <p className="text-muted-foreground">No slides were generated for this PR.</p>
           <button
             onClick={onBack}
-            className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-2"
+            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
           >
-            ← Back
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back
           </button>
         </div>
       </main>
@@ -96,21 +110,23 @@ export function ReviewPage({ review, onBack, onReReview }: Props) {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <PRSummaryBanner review={review} />
+      <PRSummaryBanner review={review} onBack={onBack} onOpenSettings={() => setSettingsOpen(true)} />
 
       {freshness && <StaleBanner freshness={freshness} onReReview={() => onReReview(review.prUrl)} />}
 
-      {currentSlide === 0 ? (
-        <OverviewSlide review={review} onNavigate={(n) => setCurrentSlide(n)} />
-      ) : (
-        <SlideView
-          slide={review.slides[currentSlide - 1]}
-          slideNumber={currentSlide}
-          totalSlides={review.slides.length}
-          pendingComments={comments}
-          commentCallbacks={commentCallbacks}
-        />
-      )}
+      <div key={currentSlide} className="slide-enter flex-1 overflow-hidden flex flex-col">
+        {currentSlide === 0 ? (
+          <OverviewSlide review={review} prStatus={prStatus} onNavigate={(n) => setCurrentSlide(n)} />
+        ) : (
+          <SlideView
+            slide={review.slides[currentSlide - 1]}
+            slideNumber={currentSlide}
+            totalSlides={review.slides.length}
+            pendingComments={comments}
+            commentCallbacks={commentCallbacks}
+          />
+        )}
+      </div>
 
       <SlideNav
         current={currentSlide}
@@ -131,14 +147,14 @@ export function ReviewPage({ review, onBack, onReReview }: Props) {
         onSubmit={handleSubmitReview}
       />
 
-      <div className="absolute top-4 left-4">
-        <button
-          onClick={onBack}
-          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-        >
-          ← New review
-        </button>
-      </div>
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onThemeChange={async () => {
+          const updated = await window.electronAPI.reRenderHunks(review);
+          setReview(updated);
+        }}
+      />
     </div>
   );
 }

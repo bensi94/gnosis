@@ -3,6 +3,7 @@ import type {
   GenerateReviewRequest,
   Preferences,
   PrSearchResult,
+  PrStatus,
   ReviewGuide,
   ReviewHistoryEntry,
   SubmitReviewRequest,
@@ -33,4 +34,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadPreferences: (): Promise<Preferences> => ipcRenderer.invoke('load-preferences'),
   savePreferences: (prefs: Preferences): Promise<void> => ipcRenderer.invoke('save-preferences', prefs),
   searchPullRequests: (): Promise<PrSearchResult[]> => ipcRenderer.invoke('search-pull-requests'),
+  reRenderHunks: (review: ReviewGuide): Promise<ReviewGuide> => ipcRenderer.invoke('re-render-hunks', review),
+  getPrStatus: (prUrl: string): Promise<PrStatus> => ipcRenderer.invoke('get-pr-status', prUrl),
 });

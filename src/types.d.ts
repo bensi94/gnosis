@@ -2,6 +2,7 @@ import type {
   GenerateReviewRequest,
   Preferences,
   PrSearchResult,
+  PrStatus,
   ReviewGuide,
   ReviewHistoryEntry,
   SubmitReviewRequest,
@@ -26,6 +27,8 @@ declare global {
       loadPreferences: () => Promise<Preferences>;
       savePreferences: (prefs: Preferences) => Promise<void>;
       searchPullRequests: () => Promise<PrSearchResult[]>;
+      reRenderHunks: (review: ReviewGuide) => Promise<ReviewGuide>;
+      getPrStatus: (prUrl: string) => Promise<PrStatus>;
     };
   }
 }
