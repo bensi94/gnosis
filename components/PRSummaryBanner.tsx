@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Markdown } from '@/components/Markdown';
 import type { ReviewGuide } from '@/lib/types';
+import { formatDuration } from '@/lib/utils';
 
 interface Props {
   review: ReviewGuide;
@@ -34,6 +35,12 @@ export function PRSummaryBanner({ review }: Props) {
                 {review.totalFilesChanged} file{review.totalFilesChanged !== 1 ? 's' : ''} changed
                 {' · '}
                 {review.totalLinesChanged} lines
+                {review.generationDurationMs != null && (
+                  <>
+                    {' · '}
+                    generated in {formatDuration(review.generationDurationMs)}
+                  </>
+                )}
               </p>
             </div>
             <a

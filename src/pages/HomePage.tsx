@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { LoadingScreen } from '../../components/LoadingScreen';
-import type { ModelId, Provider, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
-import { timeAgo } from '../../lib/utils';
+import { PRPickerDialog } from '../../components/PRPickerDialog';
+import type { ModelId, Preferences, Provider, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
+import { timeAgo, formatDuration } from '../../lib/utils';
 
 interface Props {
   onReviewReady: (review: ReviewGuide) => void;
@@ -100,23 +101,54 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [prUrl, setPrUrl] = useState(prefillPrUrl ?? '');
   const [provider, setProvider] = useState<Provider>('claude');
   const [model, setModel] = useState<ModelId>('claude-opus-4-6');
-  const [thinking, setThinking] = useState(false);
-  const [signalBoost, setSignalBoost] = useState(false);
-  const [smartImports, setSmartImports] = useState(false);
+  const [thinking, setThinking] = useState(true);
+  const [signalBoost, setSignalBoost] = useState(true);
+  const [smartImports, setSmartImports] = useState(true);
   const [instructions, setInstructions] = useState('');
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [isThinkingPhase, setIsThinkingPhase] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [history, setHistory] = useState<ReviewHistoryEntry[]>([]);
+  const [prPickerOpen, setPrPickerOpen] = useState(false);
 
   useEffect(() => {
     void window.electronAPI.getAuthState().then(({ authenticated, login }) => {
       setAuthStatus(authenticated && login ? { login } : 'unauthenticated');
     });
     void window.electronAPI.listReviews().then(setHistory);
+    void window.electronAPI.loadPreferences().then((prefs) => {
+      if (prefs.instructions) setInstructions(prefs.instructions);
+      setProvider(prefs.provider);
+      setModel(prefs.model);
+      setThinking(prefs.thinking);
+      setSignalBoost(prefs.signalBoost);
+      setSmartImports(prefs.smartImports);
+      setPrefsLoaded(true);
+    });
   }, []);
+
+  const savePrefs = useCallback(
+    (overrides?: Partial<Preferences>) => {
+      void window.electronAPI.savePreferences({
+        instructions,
+        provider,
+        model,
+        thinking,
+        signalBoost,
+        smartImports,
+        ...overrides,
+      });
+    },
+    [instructions, provider, model, thinking, signalBoost, smartImports]
+  );
+
+  // Auto-save when toggles or model/provider change (skip initial load)
+  useEffect(() => {
+    if (prefsLoaded) savePrefs();
+  }, [prefsLoaded, provider, model, thinking, signalBoost, smartImports, savePrefs]);
 
   async function handleSignIn() {
     setAuthError(null);
@@ -139,6 +171,8 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!prUrl.trim()) return;
+
+    savePrefs();
 
     setStreamingText('');
     setIsThinkingPhase(false);
@@ -274,16 +308,22 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                   <label htmlFor="pr-url" className="text-sm font-medium">
                     GitHub PR URL
                   </label>
-                  <input
-                    id="pr-url"
-                    type="url"
-                    placeholder="https://github.com/owner/repo/pull/123"
-                    value={prUrl}
-                    onChange={(e) => setPrUrl(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      id="pr-url"
+                      type="url"
+                      placeholder="https://github.com/owner/repo/pull/123"
+                      value={prUrl}
+                      onChange={(e) => setPrUrl(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      required
+                    />
+                    <Button type="button" variant="outline" onClick={() => setPrPickerOpen(true)}>
+                      Browse
+                    </Button>
+                  </div>
                 </div>
+                <PRPickerDialog open={prPickerOpen} onOpenChange={setPrPickerOpen} onSelect={setPrUrl} />
 
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="instructions" className="text-sm font-medium">
@@ -295,6 +335,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                     placeholder="e.g. focus on performance, flag any security concerns, explain the auth flow"
                     value={instructions}
                     onChange={(e) => setInstructions(e.target.value)}
+                    onBlur={() => savePrefs()}
                     className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
                   />
                 </div>
@@ -399,7 +440,9 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                           <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                             <span className="text-sm font-medium truncate">{entry.prTitle}</span>
                             <span className="text-xs text-muted-foreground truncate">
-                              {entry.author} · {entry.model ? (MODEL_LABELS[entry.model] ?? entry.model) : 'Unknown'} ·{' '}
+                              {entry.author} · {entry.model ? (MODEL_LABELS[entry.model] ?? entry.model) : 'Unknown'}
+                              {entry.generationDurationMs != null && ` · ${formatDuration(entry.generationDurationMs)}`}
+                              {' · '}
                               {timeAgo(entry.savedAt)}
                             </span>
                           </div>

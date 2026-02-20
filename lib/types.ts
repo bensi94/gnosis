@@ -33,6 +33,7 @@ export interface ReviewGuide {
   totalFilesChanged: number;
   totalLinesChanged: number;
   neighborFileCount?: number;
+  generationDurationMs?: number;
   slides: Slide[];
   headSha?: string;
 }
@@ -66,6 +67,7 @@ export interface ReviewHistoryEntry {
   author: string;
   riskLevel: 'low' | 'medium' | 'high';
   model?: ModelId;
+  generationDurationMs?: number;
   savedAt: string; // ISO date string
 }
 
@@ -81,6 +83,15 @@ export type GeminiModel =
   | 'gemini-2.5-flash';
 
 export type ModelId = ClaudeModel | GeminiModel;
+
+export interface Preferences {
+  instructions: string;
+  provider: Provider;
+  model: ModelId;
+  thinking: boolean;
+  signalBoost: boolean;
+  smartImports: boolean;
+}
 
 export interface GenerateReviewRequest {
   prUrl: string;
@@ -116,6 +127,18 @@ export type FreshnessResult =
   | { status: 'stale'; aheadBy: number; commits: FreshnessCommit[] }
   | { status: 'force-pushed' }
   | { status: 'unknown'; reason: string };
+
+export interface PrSearchResult {
+  number: number;
+  title: string;
+  url: string;
+  repoOwner: string;
+  repoName: string;
+  author: string;
+  updatedAt: string;
+  isDraft: boolean;
+  role: 'author' | 'review-requested';
+}
 
 export interface PrMetadata {
   title: string;

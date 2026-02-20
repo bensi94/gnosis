@@ -4,7 +4,15 @@ import fs from 'fs';
 import http from 'http';
 import crypto from 'crypto';
 import { Octokit } from '@octokit/rest';
-import { parsePrUrl, getPrMetadata, getPrDiff, getChangedFiles, getFileContent, getNeighborFiles } from '../lib/github';
+import {
+  parsePrUrl,
+  getPrMetadata,
+  getPrDiff,
+  getChangedFiles,
+  getFileContent,
+  getNeighborFiles,
+  searchPullRequests,
+} from '../lib/github';
 import { buildContextPackage } from '../lib/context-builder';
 import { generateReviewGuide } from '../lib/agent';
 import { renderDiffHunk, inferLanguage } from '../lib/highlight';
@@ -12,6 +20,7 @@ import { parsePatchValidLines } from '../lib/diff-lines';
 import type {
   GenerateReviewRequest,
   ModelId,
+  Preferences,
   ReviewGuide,
   ReviewHistoryEntry,
   SubmitReviewRequest,
@@ -279,12 +288,41 @@ function saveReviewToHistory(review: ReviewGuide, model?: ModelId): void {
     author: review.author,
     riskLevel: review.riskLevel,
     model,
+    generationDurationMs: review.generationDurationMs,
     savedAt,
   };
 
   const index = readReviewsIndex();
   index.unshift(entry); // newest first
   fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
+}
+
+// ── Preferences helpers ─────────────────────────────────────────
+
+function getPreferencesPath() {
+  return path.join(app.getPath('userData'), 'preferences.json');
+}
+
+const DEFAULT_PREFERENCES: Preferences = {
+  instructions: '',
+  provider: 'claude',
+  model: 'claude-opus-4-6',
+  thinking: true,
+  signalBoost: true,
+  smartImports: true,
+};
+
+function loadPreferences(): Preferences {
+  try {
+    const stored = JSON.parse(fs.readFileSync(getPreferencesPath(), 'utf-8')) as Partial<Preferences>;
+    return { ...DEFAULT_PREFERENCES, ...stored };
+  } catch {
+    return { ...DEFAULT_PREFERENCES };
+  }
+}
+
+function savePreferences(prefs: Preferences): void {
+  fs.writeFileSync(getPreferencesPath(), JSON.stringify(prefs, null, 2));
 }
 
 // ── IPC handlers ────────────────────────────────────────────────
@@ -319,6 +357,21 @@ ipcMain.handle('sign-out', () => {
   cachedToken = null;
   cachedLogin = null;
   deleteStoredToken();
+});
+
+ipcMain.handle('search-pull-requests', async () => {
+  const token = getResolvedToken();
+  if (!token || !cachedLogin) throw new Error('Not authenticated');
+  const octokit = new Octokit({ auth: token });
+  return searchPullRequests(octokit, cachedLogin);
+});
+
+ipcMain.handle('load-preferences', () => {
+  return loadPreferences();
+});
+
+ipcMain.handle('save-preferences', (_event, prefs: Preferences) => {
+  savePreferences(prefs);
 });
 
 ipcMain.handle('list-reviews', () => {
@@ -459,6 +512,7 @@ ipcMain.handle(
     );
 
     console.log('[main] Generating review guide...');
+    const generationStart = Date.now();
     const reviewGuide = await generateReviewGuide(
       contextPackage,
       prUrl,
@@ -470,6 +524,8 @@ ipcMain.handle(
       signalBoost ?? false
     );
 
+    const generationDurationMs = Date.now() - generationStart;
+
     reviewGuide.prTitle = reviewGuide.prTitle || prData.title;
     reviewGuide.prDescription = reviewGuide.prDescription || prData.description;
     reviewGuide.author = reviewGuide.author || prData.author;
@@ -478,6 +534,7 @@ ipcMain.handle(
     reviewGuide.totalFilesChanged = changedFiles.length;
     reviewGuide.totalLinesChanged = changedFiles.reduce((sum, f) => sum + f.additions + f.deletions, 0);
     reviewGuide.neighborFileCount = Object.keys(neighborFiles).length;
+    reviewGuide.generationDurationMs = generationDurationMs;
 
     for (const slide of reviewGuide.slides) {
       for (const hunk of slide.diffHunks) {

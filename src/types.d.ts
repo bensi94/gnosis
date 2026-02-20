@@ -1,5 +1,7 @@
 import type {
   GenerateReviewRequest,
+  Preferences,
+  PrSearchResult,
   ReviewGuide,
   ReviewHistoryEntry,
   SubmitReviewRequest,
@@ -21,6 +23,9 @@ declare global {
       offReviewProgress: () => void;
       submitReview: (req: SubmitReviewRequest) => Promise<{ reviewUrl: string; droppedCommentCount: number }>;
       checkPrFreshness: (prUrl: string, headSha: string | undefined) => Promise<FreshnessResult>;
+      loadPreferences: () => Promise<Preferences>;
+      savePreferences: (prefs: Preferences) => Promise<void>;
+      searchPullRequests: () => Promise<PrSearchResult[]>;
     };
   }
 }

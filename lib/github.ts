@@ -1,6 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { getProvider } from './provider';
-import type { ChangedFile, PrMetadata, Provider } from './types';
+import type { ChangedFile, PrMetadata, PrSearchResult, Provider } from './types';
 
 export function parsePrUrl(url: string): { owner: string; repo: string; pullNumber: number } {
   const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/pulls?\/(\d+)/);
@@ -98,6 +98,56 @@ export async function getFileContent(
   } catch {
     return null;
   }
+}
+
+export async function searchPullRequests(octokit: Octokit, login: string, limit = 30): Promise<PrSearchResult[]> {
+  const queries = [
+    { q: `is:pr is:open author:${login}`, role: 'author' as const },
+    { q: `is:pr is:open review-requested:${login}`, role: 'review-requested' as const },
+  ];
+
+  const results = await Promise.all(
+    queries.map(async ({ q, role }) => {
+      const { data } = await octokit.search.issuesAndPullRequests({
+        q,
+        sort: 'updated',
+        order: 'desc',
+        per_page: limit,
+      });
+      return data.items.map((item) => {
+        // repository_url looks like "https://api.github.com/repos/owner/name"
+        const repoParts = item.repository_url.split('/');
+        const repoName = repoParts.at(-1) ?? '';
+        const repoOwner = repoParts.at(-2) ?? '';
+        return {
+          number: item.number,
+          title: item.title,
+          url: item.html_url,
+          repoOwner,
+          repoName,
+          author: item.user?.login ?? 'unknown',
+          updatedAt: item.updated_at,
+          isDraft: item.draft ?? false,
+          role,
+        };
+      });
+    })
+  );
+
+  // Deduplicate by URL (a PR can appear in both queries), prefer 'review-requested' role
+  const seen = new Map<string, PrSearchResult>();
+  for (const list of results) {
+    for (const pr of list) {
+      const existing = seen.get(pr.url);
+      if (!existing || (existing.role === 'author' && pr.role === 'review-requested')) {
+        seen.set(pr.url, pr);
+      }
+    }
+  }
+
+  return Array.from(seen.values())
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, limit);
 }
 
 function extractImports(content: string, filePath: string): string[] {
