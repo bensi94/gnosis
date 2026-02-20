@@ -121,6 +121,8 @@ export interface Preferences {
   smartImports: boolean;
   codeTheme: string;
   codeFont: string;
+  claudePath: string;
+  geminiPath: string;
 }
 
 export interface GenerateReviewRequest {

@@ -45,5 +45,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   dismissUpdate: (version: string): Promise<void> => ipcRenderer.invoke('dismiss-update', version),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),
+  detectBinaryPath: (name: string): Promise<string> => ipcRenderer.invoke('detect-binary-path', name),
+  checkCliInstalled: (provider: string): Promise<{ installed: boolean; resolvedPath: string }> =>
+    ipcRenderer.invoke('check-cli-installed', provider),
   platform: process.platform,
 });

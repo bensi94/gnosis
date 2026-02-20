@@ -19,13 +19,21 @@ export function applyCodeFont(fontId: string) {
 export function SettingsDialog({ open, onOpenChange, onThemeChange }: Props) {
   const [codeTheme, setCodeTheme] = useState<CodeTheme>('aurora-x');
   const [codeFont, setCodeFont] = useState<CodeFont>('jetbrains-mono');
+  const [claudePath, setClaudePath] = useState('');
+  const [geminiPath, setGeminiPath] = useState('');
+  const [claudeDetected, setClaudeDetected] = useState('');
+  const [geminiDetected, setGeminiDetected] = useState('');
 
   useEffect(() => {
     if (!open) return;
     void window.electronAPI.loadPreferences().then((prefs) => {
       if (prefs.codeTheme) setCodeTheme(prefs.codeTheme as CodeTheme);
       if (prefs.codeFont) setCodeFont(prefs.codeFont as CodeFont);
+      setClaudePath(prefs.claudePath || '');
+      setGeminiPath(prefs.geminiPath || '');
     });
+    void window.electronAPI.detectBinaryPath('claude').then(setClaudeDetected);
+    void window.electronAPI.detectBinaryPath('gemini').then(setGeminiDetected);
   }, [open]);
 
   function saveField(overrides: Record<string, string>) {
@@ -94,6 +102,32 @@ export function SettingsDialog({ open, onOpenChange, onThemeChange }: Props) {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">Claude CLI path</label>
+            <input
+              type="text"
+              value={claudePath}
+              placeholder={claudeDetected || 'auto-detect'}
+              onChange={(e) => setClaudePath(e.target.value)}
+              onBlur={() => saveField({ claudePath })}
+              className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <p className="text-xs text-muted-foreground">Leave empty to auto-detect</p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">Gemini CLI path</label>
+            <input
+              type="text"
+              value={geminiPath}
+              placeholder={geminiDetected || 'auto-detect'}
+              onChange={(e) => setGeminiPath(e.target.value)}
+              onBlur={() => saveField({ geminiPath })}
+              className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <p className="text-xs text-muted-foreground">Leave empty to auto-detect</p>
           </div>
         </div>
       </DialogContent>

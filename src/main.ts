@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import http from 'http';
 import crypto from 'crypto';
 import { Octokit } from '@octokit/rest';
@@ -21,6 +22,7 @@ import { generateReviewGuide } from '../lib/agent';
 import { checkForUpdate } from '../lib/updater';
 import { renderDiffHunk, inferLanguage, reRenderAllHunks } from '../lib/highlight';
 import { parsePatchValidLines } from '../lib/diff-lines';
+import { setBinaryOverride, detectBinaryPath, resolveBinaryPath } from '../lib/providers/shared';
 import type {
   GenerateReviewRequest,
   ModelId,
@@ -273,6 +275,7 @@ function startUpdateChecks() {
 }
 
 void app.whenReady().then(() => {
+  applyBinaryOverrides(loadPreferences());
   createWindow();
   startUpdateChecks();
 
@@ -351,7 +354,14 @@ const DEFAULT_PREFERENCES: Preferences = {
   smartImports: true,
   codeTheme: 'aurora-x',
   codeFont: 'jetbrains-mono',
+  claudePath: '',
+  geminiPath: '',
 };
+
+function applyBinaryOverrides(prefs: Preferences): void {
+  setBinaryOverride('claude', prefs.claudePath);
+  setBinaryOverride('gemini', prefs.geminiPath);
+}
 
 function loadPreferences(): Preferences {
   try {
@@ -427,6 +437,19 @@ ipcMain.handle('load-preferences', () => {
 
 ipcMain.handle('save-preferences', (_event, prefs: Preferences) => {
   savePreferences(prefs);
+  applyBinaryOverrides(prefs);
+});
+
+ipcMain.handle('detect-binary-path', (_event, name: string) => {
+  const extra = name === 'claude' ? [`${os.homedir()}/.volta/bin/claude`] : [];
+  return detectBinaryPath(name, extra);
+});
+
+ipcMain.handle('check-cli-installed', (_event, provider: string) => {
+  const extra = provider === 'claude' ? [`${os.homedir()}/.volta/bin/claude`] : [];
+  const resolved = resolveBinaryPath(provider, extra);
+  const installed = path.isAbsolute(resolved) && fs.existsSync(resolved);
+  return { installed, resolvedPath: resolved };
 });
 
 ipcMain.handle('list-reviews', () => {
