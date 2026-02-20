@@ -277,6 +277,16 @@ const CONCISE_SUFFIX = `
 
 IMPORTANT: Be concise. Keep narrative and reviewFocus under 2 sentences each. Omit contextSnippets entirely (use empty arrays). Limit diffHunks to the 3 most important hunks per slide. Return only raw JSON starting with { and ending with }.`;
 
+const SIGNAL_BOOST_DIRECTIVE = `
+SIGNAL BOOST MODE — ACTIVE
+You must apply these rules on top of all other guidelines:
+
+1. SKIP slides for trivial changes: whitespace-only edits, import reordering, rename-only refactors, boilerplate ceremony (license headers, generated code, auto-formatted files).
+2. If there are minor changes worth noting, merge them into a single "Minor changes" slide at the END of the slides array. Otherwise omit them entirely.
+3. FOCUS slides on: system design decisions, algorithmic complexity, state management, API surface changes, security implications, error handling patterns.
+4. In reviewFocus, be more opinionated — call out what actually matters, not just what changed. Flag risks, trade-offs, and design choices the reviewer should push back on.
+`;
+
 export async function generateReviewGuide(
   contextPackage: string,
   prUrl: string,
@@ -284,16 +294,25 @@ export async function generateReviewGuide(
   instructions?: string,
   onChunk?: (chunk: string, isThinking: boolean) => void,
   thinking: boolean = false,
+  signalBoost: boolean = false,
 ): Promise<ReviewGuide> {
   const modelId = MODEL_IDS[model];
 
   async function attempt(extraInstruction: string = ''): Promise<{ guide: ReviewGuide; truncated: boolean }> {
-    const userMessage = contextPackage + USER_SUFFIX + extraInstruction;
+    const customInstructions = instructions?.trim();
+    const userMessage = customInstructions
+      ? contextPackage + USER_SUFFIX + extraInstruction + `\n\n<reviewer_instructions>\nThe reviewer has provided custom instructions that MUST take priority over default style guidelines.\n${customInstructions}\n</reviewer_instructions>`
+      : contextPackage + USER_SUFFIX + extraInstruction;
 
-    const system = instructions?.trim()
-      ? `${SYSTEM_PROMPT}\n\nREVIEWER INSTRUCTIONS: ${instructions.trim()}`
+    const baseSystem = signalBoost
+      ? `${SIGNAL_BOOST_DIRECTIVE}\n${SYSTEM_PROMPT}`
       : SYSTEM_PROMPT;
 
+    const system = customInstructions
+      ? `${baseSystem}\n\nIMPORTANT — CUSTOM REVIEWER INSTRUCTIONS:\nThe reviewer has provided the following instructions. These take precedence over the default writing style and tone guidelines above. Adapt your narrative, reviewFocus, summary, and all prose fields accordingly.\n\n<instructions>\n${customInstructions}\n</instructions>`
+      : baseSystem;
+
+    console.log('[agent] Custom instructions:', customInstructions ?? '(none)');
     console.log('[agent] Calling Claude CLI...');
     const fullText = await callClaudeCLI(userMessage, system, modelId, thinking, onChunk);
     console.log('[agent] Generation complete, parsing response...');

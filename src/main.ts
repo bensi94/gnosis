@@ -336,7 +336,7 @@ ipcMain.handle('delete-review', async (_event, id: string) => {
   fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
 });
 
-ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, thinking }: GenerateReviewRequest) => {
+ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, thinking, signalBoost }: GenerateReviewRequest) => {
   const token = getResolvedToken();
   const octokit = new Octokit({ auth: token ?? undefined });
 
@@ -399,6 +399,7 @@ ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, t
     contextPackage, prUrl, model, instructions,
     (chunk, isThinking) => _event.sender.send('review-progress', { chunk, isThinking }),
     thinking ?? false,
+    signalBoost ?? false,
   );
 
   reviewGuide.prTitle = reviewGuide.prTitle || prData.title;
