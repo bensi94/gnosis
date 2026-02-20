@@ -252,27 +252,12 @@ function createWindow() {
 
 // ── Update check helpers ─────────────────────────────────────
 
-function getDismissedUpdatePath() {
-  return path.join(app.getPath('userData'), 'update-dismissed.json');
-}
-
-function getDismissedVersion(): string | null {
-  try {
-    const data = JSON.parse(fs.readFileSync(getDismissedUpdatePath(), 'utf-8')) as { version?: string };
-    return data.version ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function setDismissedVersion(version: string) {
-  fs.writeFileSync(getDismissedUpdatePath(), JSON.stringify({ version }));
-}
+let dismissedUpdateVersion: string | null = null;
 
 async function runUpdateCheck() {
   const update = await checkForUpdate(app.getVersion());
   if (!update) return;
-  if (getDismissedVersion() === update.version) return;
+  if (dismissedUpdateVersion === update.version) return;
 
   const windows = BrowserWindow.getAllWindows();
   for (const win of windows) {
@@ -374,7 +359,7 @@ function savePreferences(prefs: Preferences): void {
 // ── IPC handlers ────────────────────────────────────────────────
 
 ipcMain.handle('dismiss-update', (_event, version: string) => {
-  setDismissedVersion(version);
+  dismissedUpdateVersion = version;
 });
 
 ipcMain.handle('open-external', (_event, url: string) => {
