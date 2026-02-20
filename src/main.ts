@@ -263,7 +263,7 @@ function readReviewsIndex(): ReviewHistoryEntry[] {
   }
 }
 
-function saveReviewToHistory(review: ReviewGuide): void {
+function saveReviewToHistory(review: ReviewGuide, model?: string): void {
   ensureReviewsDir();
   const id = Date.now().toString();
   const savedAt = new Date().toISOString();
@@ -279,6 +279,7 @@ function saveReviewToHistory(review: ReviewGuide): void {
     prUrl: review.prUrl,
     author: review.author,
     riskLevel: review.riskLevel,
+    model,
     savedAt,
   };
 
@@ -387,7 +388,7 @@ ipcMain.handle('check-pr-freshness', async (_event, prUrl: string, headSha: stri
   }
 });
 
-ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, thinking, signalBoost, smartImports }: GenerateReviewRequest) => {
+ipcMain.handle('generate-review', async (_event, { prUrl, provider, model, instructions, thinking, signalBoost, smartImports }: GenerateReviewRequest) => {
   const token = getResolvedToken();
   const octokit = new Octokit({ auth: token ?? undefined });
 
@@ -435,7 +436,7 @@ ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, t
     changedFiles.map((f) => f.filename),
     allFileContents,
     baseRef,
-    smartImports,
+    smartImports ? provider : undefined,
   );
 
   const contextPackage = buildContextPackage(
@@ -449,7 +450,7 @@ ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, t
 
   console.log('[main] Generating review guide...');
   const reviewGuide = await generateReviewGuide(
-    contextPackage, prUrl, model, instructions,
+    contextPackage, prUrl, provider, model, instructions,
     (chunk, isThinking) => _event.sender.send('review-progress', { chunk, isThinking }),
     thinking ?? false,
     signalBoost ?? false,
@@ -481,7 +482,7 @@ ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, t
     }
   }
 
-  saveReviewToHistory(reviewGuide);
+  saveReviewToHistory(reviewGuide, model);
   return reviewGuide;
 });
 

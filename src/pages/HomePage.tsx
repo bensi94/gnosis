@@ -20,10 +20,39 @@ const riskConfig = {
   high:   { label: 'High',   className: 'bg-red-900 text-red-200 border-red-700' },
 };
 
+const PROVIDERS = {
+  claude: {
+    label: 'Claude',
+    models: [
+      { id: 'claude-opus-4-6', label: 'Opus 4.6' },
+      { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+      { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+    ],
+  },
+  gemini: {
+    label: 'Gemini',
+    models: [
+      { id: 'gemini-3.1-pro-preview', label: '3.1 Pro' },
+      { id: 'gemini-3-pro-preview', label: '3 Pro' },
+      { id: 'gemini-3-flash-preview', label: '3 Flash' },
+      { id: 'gemini-2.5-pro', label: '2.5 Pro' },
+      { id: 'gemini-2.5-flash', label: '2.5 Flash' },
+    ],
+  },
+} as const;
+
+const MODEL_LABELS: Record<string, string> = {};
+for (const p of Object.values(PROVIDERS)) {
+  for (const m of p.models) {
+    MODEL_LABELS[m.id] = `${p.label} ${m.label}`;
+  }
+}
+
 export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [prUrl, setPrUrl] = useState(prefillPrUrl ?? '');
-  const [model, setModel] = useState<'opus' | 'sonnet'>('opus');
+  const [provider, setProvider] = useState<'claude' | 'gemini'>('claude');
+  const [model, setModel] = useState('claude-opus-4-6');
   const [thinking, setThinking] = useState(false);
   const [signalBoost, setSignalBoost] = useState(false);
   const [smartImports, setSmartImports] = useState(false);
@@ -81,6 +110,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     try {
       const review = await window.electronAPI.generateReview({
         prUrl: prUrl.trim(),
+        provider,
         model,
         instructions: instructions.trim() || undefined,
         thinking,
@@ -117,7 +147,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   if (loading) {
     return (
       <LoadingScreen
-        message={isThinkingPhase ? 'Claude is thinking...' : 'Generating review guide...'}
+        message={isThinkingPhase ? 'Thinking...' : 'Generating review guide...'}
         streamingText={streamingText}
       />
     );
@@ -220,52 +250,75 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Model</label>
+                  <label className="text-sm font-medium">Provider</label>
                   <div className="flex gap-2">
-                    {(['opus', 'sonnet'] as const).map((m) => (
+                    {(['claude', 'gemini'] as const).map((p) => (
                       <button
-                        key={m}
+                        key={p}
                         type="button"
-                        onClick={() => setModel(m)}
+                        onClick={() => {
+                          setProvider(p);
+                          setModel(PROVIDERS[p].models[0].id);
+                          if (p === 'gemini') setThinking(false);
+                        }}
                         className={`flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                          model === m
+                          provider === p
                             ? 'border-primary bg-primary text-primary-foreground'
                             : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
                         }`}
                       >
-                        {m === 'opus' ? 'Opus 4.6' : 'Sonnet 4.6'}
+                        {PROVIDERS[p].label}
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {model === 'opus' ? 'Best quality · slower' : 'Faster · lower cost'}
-                  </p>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5">
-                    <label htmlFor="thinking" className="text-sm font-medium">Extended thinking</label>
-                    <p className="text-xs text-muted-foreground">
-                      {thinking ? 'Deeper reasoning · slower' : 'Standard speed'}
-                    </p>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">Model</label>
+                  <div className="flex flex-wrap gap-2">
+                    {PROVIDERS[provider].models.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setModel(m.id)}
+                        className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                          model === m.id
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
                   </div>
-                  <button
-                    id="thinking"
-                    type="button"
-                    role="switch"
-                    aria-checked={thinking}
-                    onClick={() => setThinking((t) => !t)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      thinking ? 'bg-primary' : 'bg-input'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                        thinking ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
                 </div>
+
+                {provider === 'claude' && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-0.5">
+                      <label htmlFor="thinking" className="text-sm font-medium">Extended thinking</label>
+                      <p className="text-xs text-muted-foreground">
+                        {thinking ? 'Deeper reasoning · slower' : 'Standard speed'}
+                      </p>
+                    </div>
+                    <button
+                      id="thinking"
+                      type="button"
+                      role="switch"
+                      aria-checked={thinking}
+                      onClick={() => setThinking((t) => !t)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        thinking ? 'bg-primary' : 'bg-input'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
+                          thinking ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col gap-0.5">
@@ -359,7 +412,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                           <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                             <span className="text-sm font-medium truncate">{entry.prTitle}</span>
                             <span className="text-xs text-muted-foreground truncate">
-                              {entry.author} · {timeAgo(entry.savedAt)}
+                              {entry.author} · {entry.model ? MODEL_LABELS[entry.model] ?? entry.model : 'Unknown'} · {timeAgo(entry.savedAt)}
                             </span>
                           </div>
                           <Badge variant="outline" className={`shrink-0 text-xs ${risk.className}`}>

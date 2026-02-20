@@ -72,12 +72,14 @@ export interface ReviewHistoryEntry {
   prUrl: string;
   author: string;
   riskLevel: 'low' | 'medium' | 'high';
+  model?: string;
   savedAt: string; // ISO date string
 }
 
 export interface GenerateReviewRequest {
   prUrl: string;
-  model: 'opus' | 'sonnet';
+  provider: 'claude' | 'gemini';
+  model: string;
   instructions?: string;
   thinking?: boolean;
   signalBoost?: boolean;
