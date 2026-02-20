@@ -1,5 +1,3 @@
-'use client';
-
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { MessageSquarePlus, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

@@ -1,5 +1,3 @@
-'use client';
-
 import { MessageSquarePlus, Presentation, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
