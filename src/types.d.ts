@@ -7,6 +7,7 @@ import type {
   ReviewHistoryEntry,
   SubmitReviewRequest,
   FreshnessResult,
+  UpdateInfo,
 } from '../lib/types';
 
 declare global {
@@ -29,6 +30,11 @@ declare global {
       searchPullRequests: () => Promise<PrSearchResult[]>;
       reRenderHunks: (review: ReviewGuide) => Promise<ReviewGuide>;
       getPrStatus: (prUrl: string) => Promise<PrStatus>;
+      onUpdateAvailable: (callback: (info: UpdateInfo) => void) => void;
+      offUpdateAvailable: () => void;
+      dismissUpdate: (version: string) => Promise<void>;
+      openExternal: (url: string) => Promise<void>;
+      platform: NodeJS.Platform;
     };
   }
 }

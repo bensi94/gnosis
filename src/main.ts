@@ -18,6 +18,7 @@ import {
 import type { CiCheck, PrStatus } from '../lib/types';
 import { buildContextPackage } from '../lib/context-builder';
 import { generateReviewGuide } from '../lib/agent';
+import { checkForUpdate } from '../lib/updater';
 import { renderDiffHunk, inferLanguage, reRenderAllHunks } from '../lib/highlight';
 import { parsePatchValidLines } from '../lib/diff-lines';
 import type {
@@ -249,14 +250,43 @@ function createWindow() {
   }
 }
 
+// ── Update check helpers ─────────────────────────────────────
+
+let dismissedUpdateVersion: string | null = null;
+
+async function runUpdateCheck() {
+  const update = await checkForUpdate(app.getVersion());
+  if (!update) return;
+  if (dismissedUpdateVersion === update.version) return;
+
+  const windows = BrowserWindow.getAllWindows();
+  for (const win of windows) {
+    win.webContents.send('update-available', update);
+  }
+}
+
+let updateInterval: ReturnType<typeof setInterval> | null = null;
+
+function startUpdateChecks() {
+  setTimeout(() => void runUpdateCheck(), 5_000);
+  updateInterval = setInterval(() => void runUpdateCheck(), 4 * 60 * 60 * 1_000);
+}
+
 void app.whenReady().then(() => {
   createWindow();
+  startUpdateChecks();
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (!updateInterval) startUpdateChecks();
   });
 });
 
 app.on('window-all-closed', () => {
+  if (updateInterval) {
+    clearInterval(updateInterval);
+    updateInterval = null;
+  }
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -337,6 +367,20 @@ function savePreferences(prefs: Preferences): void {
 }
 
 // ── IPC handlers ────────────────────────────────────────────────
+
+ipcMain.handle('dismiss-update', (_event, version: string) => {
+  dismissedUpdateVersion = version;
+});
+
+ipcMain.handle('open-external', (_event, url: string) => {
+  try {
+    if (new URL(url).protocol === 'https:') {
+      void shell.openExternal(url);
+    }
+  } catch {
+    // invalid URL — ignore
+  }
+});
 
 // Backward-compat shim — renderer still calls getConfig to check if signed in
 ipcMain.handle('get-config', () => {
