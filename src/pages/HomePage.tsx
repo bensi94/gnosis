@@ -26,6 +26,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [model, setModel] = useState<'opus' | 'sonnet'>('opus');
   const [thinking, setThinking] = useState(false);
   const [signalBoost, setSignalBoost] = useState(false);
+  const [smartImports, setSmartImports] = useState(false);
   const [instructions, setInstructions] = useState('');
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
@@ -84,6 +85,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
         instructions: instructions.trim() || undefined,
         thinking,
         signalBoost,
+        smartImports,
       });
       window.electronAPI.listReviews().then(setHistory);
       onReviewReady(review);
@@ -290,6 +292,36 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                     <span
                       className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
                         signalBoost ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <label htmlFor="smart-imports" className="text-sm font-medium">
+                      Smart imports{' '}
+                      <span className="ml-1 inline-block rounded bg-amber-900/60 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 leading-none align-middle">
+                        Experimental
+                      </span>
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Use AI to find related files across all languages
+                    </p>
+                  </div>
+                  <button
+                    id="smart-imports"
+                    type="button"
+                    role="switch"
+                    aria-checked={smartImports}
+                    onClick={() => setSmartImports((s) => !s)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      smartImports ? 'bg-primary' : 'bg-input'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
+                        smartImports ? 'translate-x-4' : 'translate-x-0'
                       }`}
                     />
                   </button>

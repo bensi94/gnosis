@@ -27,6 +27,11 @@ export function OverviewSlide({ review, onNavigate }: Props) {
       <div className="flex flex-col gap-2">
         <p className="text-xs uppercase tracking-wider text-muted-foreground">AI Summary</p>
         <Markdown className="text-base leading-relaxed">{review.summary}</Markdown>
+        {(review.neighborFileCount ?? 0) > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {review.neighborFileCount} additional {review.neighborFileCount === 1 ? 'file' : 'files'} included for context
+          </p>
+        )}
       </div>
 
       {/* PR Description */}

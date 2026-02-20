@@ -1,4 +1,5 @@
 import { Octokit } from '@octokit/rest';
+import { callClaudeQuick } from './agent';
 import type { ChangedFile, PrMetadata } from './types';
 
 export function parsePrUrl(url: string): { owner: string; repo: string; pullNumber: number } {
@@ -134,14 +135,85 @@ function resolveRelativePath(dir: string, importPath: string): string | null {
 
 const TS_EXTENSIONS = ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx', '/index.js'];
 
+const SMART_IMPORTS_SYSTEM_PROMPT = `You are a code analysis tool. Given source files from a repository, identify all local/internal file imports. Return repo-relative file paths as a JSON array of strings. Nothing else.
+
+Rules:
+- Only include imports that reference files within the same repository
+- Skip standard library, external packages, and framework imports
+- Resolve relative imports to repo-relative paths using each file's location
+- For C# \`using\` statements, infer the likely file path from the namespace (use the file's own namespace declaration for context)
+- Include file extensions (e.g., .cs, .rs, .py, .go, .ts)
+- Return unique paths only`;
+
+async function extractImportsWithClaude(
+  changedFileContents: Record<string, string>,
+  changedFilePaths: string[],
+): Promise<string[]> {
+  const fileEntries = changedFilePaths
+    .filter((p) => changedFileContents[p])
+    .map((p) => `--- ${p} ---\n${changedFileContents[p]}`)
+    .join('\n\n');
+
+  if (!fileEntries) return [];
+
+  try {
+    const result = await callClaudeQuick(
+      fileEntries,
+      SMART_IMPORTS_SYSTEM_PROMPT,
+      'claude-haiku-4-5-20251001',
+    );
+
+    // Extract JSON array from response
+    const start = result.indexOf('[');
+    const end = result.lastIndexOf(']');
+    if (start === -1 || end <= start) return [];
+
+    const parsed = JSON.parse(result.slice(start, end + 1));
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((p): p is string => typeof p === 'string');
+  } catch (err) {
+    console.warn('[github] Smart import extraction failed, returning empty:', err);
+    return [];
+  }
+}
+
 export async function getNeighborFiles(
   octokit: Octokit,
   owner: string,
   repo: string,
   changedFilePaths: string[],
   changedFileContents: Record<string, string>,
-  ref: string
+  ref: string,
+  useSmartImports?: boolean,
 ): Promise<Record<string, string>> {
+  if (useSmartImports) {
+    console.log('[github] Using smart (Claude) import extraction');
+    const importPaths = await extractImportsWithClaude(changedFileContents, changedFilePaths);
+    console.log(`[github] Claude found ${importPaths.length} import(s):`, importPaths);
+
+    // Filter out paths already in the changed set
+    const neighborPaths = importPaths.filter((p) => !changedFilePaths.includes(p));
+    console.log(`[github] ${neighborPaths.length} neighbor file(s) to fetch (after excluding changed files)`);
+    const pathsToFetch = neighborPaths.slice(0, 30);
+
+    const results: Record<string, string> = {};
+    const concurrency = 5;
+    for (let i = 0; i < pathsToFetch.length; i += concurrency) {
+      const batch = pathsToFetch.slice(i, i + concurrency);
+      await Promise.all(
+        batch.map(async (filePath) => {
+          const content = await getFileContent(octokit, owner, repo, filePath, ref);
+          if (content !== null) {
+            results[filePath] = content;
+          }
+        }),
+      );
+    }
+    console.log(`[github] Fetched ${Object.keys(results).length} neighbor file(s):`, Object.keys(results));
+    return results;
+  }
+
+  // Default: existing regex-based extraction
   const neighborPaths = new Set<string>();
 
   for (const filePath of changedFilePaths) {
@@ -150,7 +222,6 @@ export async function getNeighborFiles(
 
     const imports = extractImports(content, filePath);
     for (const imp of imports) {
-      // Don't include files already in the changed set
       const alreadyChanged = changedFilePaths.some(
         (p) => p === imp || TS_EXTENSIONS.some((ext) => p === imp + ext)
       );
@@ -163,13 +234,11 @@ export async function getNeighborFiles(
   const results: Record<string, string> = {};
   const pathsToFetch = Array.from(neighborPaths).slice(0, 30);
 
-  // Concurrency limit: 5 parallel requests
   const concurrency = 5;
   for (let i = 0; i < pathsToFetch.length; i += concurrency) {
     const batch = pathsToFetch.slice(i, i + concurrency);
     await Promise.all(
       batch.map(async (basePath) => {
-        // Try each extension
         for (const ext of TS_EXTENSIONS) {
           const fullPath = basePath + ext;
           const content = await getFileContent(octokit, owner, repo, fullPath, ref);
