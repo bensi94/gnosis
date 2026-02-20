@@ -1,5 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
-import { LogOut, CircleCheck, Search, SlidersHorizontal, Play, History, Trash2, Settings } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  LogOut,
+  CircleCheck,
+  Search,
+  SlidersHorizontal,
+  Play,
+  History,
+  Trash2,
+  Settings,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import { GitHubIcon } from '../../lib/constants';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
@@ -10,7 +21,7 @@ import { PRPickerDialog } from '../../components/PRPickerDialog';
 import { SettingsDialog } from '../../components/SettingsDialog';
 import { riskConfig } from '../../lib/constants';
 import type { ModelId, Preferences, Provider, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
-import { timeAgo, formatDuration } from '../../lib/utils';
+import { timeAgo, formatDuration, groupReviewsByPR } from '../../lib/utils';
 
 interface Props {
   onReviewReady: (review: ReviewGuide) => void;
@@ -112,6 +123,9 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [history, setHistory] = useState<ReviewHistoryEntry[]>([]);
   const [prPickerOpen, setPrPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [expandedPRs, setExpandedPRs] = useState<Set<string>>(new Set());
+
+  const prGroups = useMemo(() => groupReviewsByPR(history), [history]);
 
   useEffect(() => {
     void window.electronAPI.getAuthState().then(({ authenticated, login }) => {
@@ -288,7 +302,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
         {/* Two-column layout: form + history */}
         {isAuthenticated && (
           <div
-            className={`grid gap-6 items-start ${history.length > 0 ? 'grid-cols-[2fr_3fr]' : 'max-w-lg mx-auto w-full'}`}
+            className={`grid gap-6 items-start ${prGroups.length > 0 ? 'grid-cols-[2fr_3fr]' : 'max-w-lg mx-auto w-full'}`}
           >
             {/* PR form */}
             <Card>
@@ -436,45 +450,112 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
             </Card>
 
             {/* History */}
-            {history.length > 0 && (
+            {prGroups.length > 0 && (
               <Card className="min-h-0 max-h-[calc(100vh-12rem)] sticky top-8 overflow-hidden flex flex-col bg-card/50">
                 <div className="px-4 pt-4 pb-2">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     <History className="h-3 w-3" />
-                    Recent reviews
+                    Review history
                   </p>
                 </div>
                 <CardContent className="p-0 flex-1 overflow-y-auto min-h-0">
                   <ul className="divide-y">
-                    {history.map((entry) => {
-                      const risk = riskConfig[entry.riskLevel];
+                    {prGroups.map((group) => {
+                      const risk = riskConfig[group.latestReview.riskLevel];
+                      const hasMultiple = group.reviews.length > 1;
+                      const isExpanded = expandedPRs.has(group.prUrl);
+
                       return (
-                        <li key={entry.id}>
-                          <button
-                            onClick={() => handleLoadFromHistory(entry.id)}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors group"
-                          >
-                            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                              <span className="text-sm font-medium truncate">{entry.prTitle}</span>
-                              <span className="text-xs text-muted-foreground truncate">
-                                {entry.author} · {entry.model ? (MODEL_LABELS[entry.model] ?? entry.model) : 'Unknown'}
-                                {entry.generationDurationMs != null &&
-                                  ` · ${formatDuration(entry.generationDurationMs)}`}
-                                {' · '}
-                                {timeAgo(entry.savedAt)}
-                              </span>
+                        <li key={group.prUrl}>
+                          <div className="flex items-center gap-1 px-4 py-3 hover:bg-muted/50 transition-colors group">
+                            <div className="shrink-0 w-5 flex items-center justify-center">
+                              {hasMultiple && (
+                                <button
+                                  onClick={() =>
+                                    setExpandedPRs((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(group.prUrl)) next.delete(group.prUrl);
+                                      else next.add(group.prUrl);
+                                      return next;
+                                    })
+                                  }
+                                  className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                                  aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+                              )}
                             </div>
+                            <button
+                              onClick={() => handleLoadFromHistory(group.latestReview.id)}
+                              className="flex-1 min-w-0 flex items-center gap-3 text-left"
+                            >
+                              <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                <span className="text-sm font-medium truncate">{group.prTitle}</span>
+                                <span className="text-xs text-muted-foreground truncate">
+                                  {group.repoRef} · {group.author} · {timeAgo(group.latestReview.savedAt)}
+                                  {hasMultiple && ` · ${group.reviews.length} reviews`}
+                                </span>
+                              </div>
+                            </button>
                             <Badge variant="outline" className={`shrink-0 text-xs ${risk.badgeClassName}`}>
                               {risk.label}
                             </Badge>
-                            <button
-                              onClick={(e) => handleDeleteFromHistory(e, entry.id)}
-                              className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity px-1"
-                              aria-label="Delete"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </button>
+                            <div className="shrink-0 w-7 flex items-center justify-center">
+                              {!hasMultiple && (
+                                <button
+                                  onClick={(e) => handleDeleteFromHistory(e, group.latestReview.id)}
+                                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity px-1"
+                                  aria-label="Delete"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {hasMultiple && isExpanded && (
+                            <ul className="border-t border-border/50">
+                              {group.reviews.map((review) => {
+                                const reviewRisk = riskConfig[review.riskLevel];
+                                return (
+                                  <li key={review.id}>
+                                    <button
+                                      onClick={() => handleLoadFromHistory(review.id)}
+                                      className="w-full flex items-center gap-3 pl-10 pr-4 py-2 text-left hover:bg-muted/30 transition-colors group/review"
+                                    >
+                                      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                        <span className="text-xs text-muted-foreground truncate">
+                                          {review.model ? (MODEL_LABELS[review.model] ?? review.model) : 'Unknown'}
+                                          {review.generationDurationMs != null &&
+                                            ` · ${formatDuration(review.generationDurationMs)}`}
+                                          {' · '}
+                                          {timeAgo(review.savedAt)}
+                                        </span>
+                                      </div>
+                                      <Badge
+                                        variant="outline"
+                                        className={`shrink-0 text-xs ${reviewRisk.badgeClassName}`}
+                                      >
+                                        {reviewRisk.label}
+                                      </Badge>
+                                      <button
+                                        onClick={(e) => handleDeleteFromHistory(e, review.id)}
+                                        className="shrink-0 opacity-0 group-hover/review:opacity-100 text-muted-foreground hover:text-destructive transition-opacity px-1"
+                                        aria-label="Delete"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
                         </li>
                       );
                     })}

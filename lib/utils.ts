@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import type { ReviewHistoryEntry } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -23,4 +24,44 @@ export function timeAgo(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   if (days < 7) return `${days}d ago`;
   return new Date(iso).toLocaleDateString();
+}
+
+export function parseRepoRef(prUrl: string): string {
+  const match = prUrl.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+  return match ? `${match[1]}#${match[2]}` : prUrl;
+}
+
+export interface PRGroup {
+  prUrl: string;
+  repoRef: string;
+  prTitle: string;
+  author: string;
+  latestReview: ReviewHistoryEntry;
+  reviews: ReviewHistoryEntry[];
+}
+
+export function groupReviewsByPR(history: ReviewHistoryEntry[]): PRGroup[] {
+  const map = new Map<string, ReviewHistoryEntry[]>();
+  for (const entry of history) {
+    const list = map.get(entry.prUrl);
+    if (list) list.push(entry);
+    else map.set(entry.prUrl, [entry]);
+  }
+
+  const groups: PRGroup[] = [];
+  for (const [prUrl, reviews] of map) {
+    reviews.sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+    const latest = reviews[0];
+    groups.push({
+      prUrl,
+      repoRef: parseRepoRef(prUrl),
+      prTitle: latest.prTitle,
+      author: latest.author,
+      latestReview: latest,
+      reviews,
+    });
+  }
+
+  groups.sort((a, b) => new Date(b.latestReview.savedAt).getTime() - new Date(a.latestReview.savedAt).getTime());
+  return groups;
 }
