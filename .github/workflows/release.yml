@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-latest   # arm64 (Apple Silicon)
+          - macos-latest # arm64 (Apple Silicon)
           - windows-latest # x64
 
     steps:

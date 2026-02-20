@@ -87,9 +87,7 @@ export function StaleBanner({ freshness, onReReview }: Props) {
               </span>
             </li>
           ))}
-          {overflow > 0 && (
-            <li className="text-xs text-yellow-200/50">and {overflow} more...</li>
-          )}
+          {overflow > 0 && <li className="text-xs text-yellow-200/50">and {overflow} more...</li>}
         </ul>
       )}
     </div>

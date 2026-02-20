@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { MessageSquarePlus, X, Pencil, Trash2 } from 'lucide-react';
+import { MessageSquarePlus, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DiffHunkGroup } from '@/components/DiffHunk';
 import { parseDiffLines, type DiffLineInfo } from '@/lib/diff-lines';
 import type { DiffHunk, PendingReviewComment, DiffSide } from '@/lib/types';
 
@@ -53,9 +52,7 @@ function parseShikiLines(renderedHtml: string): string[] | null {
  * Extract the Shiki theme styles from the rendered <pre> element so we can
  * re-apply them when rendering individual lines outside the original tree.
  */
-function extractShikiStyles(
-  renderedHtml: string,
-): { preStyle: Record<string, string>; preClass: string } {
+function extractShikiStyles(renderedHtml: string): { preStyle: Record<string, string>; preClass: string } {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(renderedHtml, 'text/html');
@@ -65,8 +62,8 @@ function extractShikiStyles(
     const preStyle: Record<string, string> = {};
     for (const decl of styleStr.split(';')) {
       const [prop, ...rest] = decl.split(':');
-      if (!prop?.trim() || rest.length === 0) continue;
-      const camel = prop.trim().replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      if (!prop.trim() || rest.length === 0) continue;
+      const camel = prop.trim().replace(/-([a-z])/g, (_match, c: string) => c.toUpperCase());
       preStyle[camel] = rest.join(':').trim();
     }
     return {
@@ -119,11 +116,7 @@ function InlineCommentForm({
         <Button variant="ghost" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        <Button
-          size="sm"
-          onClick={() => body.trim() && onSubmit(body.trim())}
-          disabled={!body.trim()}
-        >
+        <Button size="sm" onClick={() => body.trim() && onSubmit(body.trim())} disabled={!body.trim()}>
           Add comment
         </Button>
       </div>
@@ -157,9 +150,7 @@ function CommentBubble({
 
   return (
     <div className="mx-2 my-1 border rounded-md bg-blue-950/30 border-blue-800/30 p-2 flex gap-2 group">
-      <pre className="flex-1 text-xs font-mono whitespace-pre-wrap break-words text-blue-200">
-        {comment.body}
-      </pre>
+      <pre className="flex-1 text-xs font-mono whitespace-pre-wrap break-words text-blue-200">{comment.body}</pre>
       <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         <button
           onClick={() => setEditing(true)}
@@ -196,10 +187,7 @@ function InteractiveHunk({
 } & CommentCallbacks) {
   const [activeFormLine, setActiveFormLine] = useState<number | null>(null);
 
-  const lineInfos = useMemo(
-    () => parseDiffLines(hunk.hunkHeader, hunk.content),
-    [hunk.hunkHeader, hunk.content],
-  );
+  const lineInfos = useMemo(() => parseDiffLines(hunk.hunkHeader, hunk.content), [hunk.hunkHeader, hunk.content]);
 
   const lineHtmls = useMemo(() => parseShikiLines(hunk.renderedHtml), [hunk.renderedHtml]);
   const shikiStyles = useMemo(() => extractShikiStyles(hunk.renderedHtml), [hunk.renderedHtml]);
@@ -238,16 +226,11 @@ function InteractiveHunk({
       <code style={{ display: 'block', fontSize: 0, minWidth: '100%', width: 'max-content' }}>
         {lines.map((line, idx) => {
           const lineComments = pendingComments.filter(
-            (c) => c.line === line.info.lineNumber && c.filePath === filePath,
+            (c) => c.line === line.info.lineNumber && c.filePath === filePath
           );
           const isFormActive = activeFormLine === line.info.lineNumber;
 
-          const diffClass =
-            line.info.type === 'add'
-              ? 'diff add'
-              : line.info.type === 'remove'
-                ? 'diff remove'
-                : '';
+          const diffClass = line.info.type === 'add' ? 'diff add' : line.info.type === 'remove' ? 'diff remove' : '';
 
           return (
             <span key={idx}>
@@ -294,9 +277,7 @@ function InteractiveHunk({
                   }}
                   onClick={() => handleAddComment(line.info)}
                 >
-                  <MessageSquarePlus
-                    style={{ width: '0.75rem', height: '0.75rem', color: '#58a6ff' }}
-                  />
+                  <MessageSquarePlus style={{ width: '0.75rem', height: '0.75rem', color: '#58a6ff' }} />
                 </span>
 
                 {/* Diff gutter character */}
@@ -309,11 +290,7 @@ function InteractiveHunk({
                       userSelect: 'none',
                       flexShrink: 0,
                       color:
-                        line.info.type === 'add'
-                          ? '#3fb950'
-                          : line.info.type === 'remove'
-                            ? '#f85149'
-                            : 'transparent',
+                        line.info.type === 'add' ? '#3fb950' : line.info.type === 'remove' ? '#f85149' : 'transparent',
                     }}
                   >
                     {line.info.type === 'add' ? '+' : line.info.type === 'remove' ? '-' : ' '}
@@ -321,10 +298,7 @@ function InteractiveHunk({
                 )}
 
                 {/* Code content */}
-                <span
-                  dangerouslySetInnerHTML={{ __html: line.html }}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
+                <span dangerouslySetInnerHTML={{ __html: line.html }} style={{ flex: 1, minWidth: 0 }} />
               </span>
 
               {/* Comment form */}
@@ -337,12 +311,7 @@ function InteractiveHunk({
 
               {/* Pending comments for this line */}
               {lineComments.map((c) => (
-                <CommentBubble
-                  key={c.id}
-                  comment={c}
-                  onRemove={onRemoveComment}
-                  onEdit={onEditComment}
-                />
+                <CommentBubble key={c.id} comment={c} onRemove={onRemoveComment} onEdit={onEditComment} />
               ))}
             </span>
           );

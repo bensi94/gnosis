@@ -1,0 +1,52 @@
+version: '3'
+
+tasks:
+  dev:
+    desc: Start development server
+    cmds:
+      - npm start
+
+  lint:
+    desc: Run ESLint
+    cmds:
+      - npm run lint
+
+  lint:fix:
+    desc: Run ESLint with auto-fix
+    cmds:
+      - npm run lint:fix
+
+  format:
+    desc: Format code with Prettier
+    cmds:
+      - npm run format
+
+  format:check:
+    desc: Check code formatting
+    cmds:
+      - npm run format:check
+
+  pre-commit:install:
+    desc: Install pre-commit hooks
+    cmds:
+      - pre-commit install
+
+  pre-commit:run:
+    desc: Run all pre-commit hooks
+    cmds:
+      - pre-commit run --all-files
+
+  package:
+    desc: Package the app
+    cmds:
+      - npm run package
+
+  make:
+    desc: Build distributable
+    cmds:
+      - npm run make
+
+  publish:
+    desc: Publish release
+    cmds:
+      - npm run publish

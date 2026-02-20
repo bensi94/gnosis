@@ -15,9 +15,9 @@ interface Props {
 type AuthStatus = 'checking' | 'unauthenticated' | 'signing-in' | { login: string };
 
 const riskConfig = {
-  low:    { label: 'Low',    className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
+  low: { label: 'Low', className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
   medium: { label: 'Medium', className: 'bg-blue-900 text-blue-200 border-blue-700' },
-  high:   { label: 'High',   className: 'bg-red-900 text-red-200 border-red-700' },
+  high: { label: 'High', className: 'bg-red-900 text-red-200 border-red-700' },
 };
 
 const PROVIDERS = {
@@ -42,9 +42,7 @@ const PROVIDERS = {
 } as const;
 
 const MODEL_LABELS: Record<string, string> = Object.fromEntries(
-  Object.values(PROVIDERS).flatMap((p) =>
-    p.models.map((m) => [m.id, `${p.label} ${m.label}`]),
-  ),
+  Object.values(PROVIDERS).flatMap((p) => p.models.map((m) => [m.id, `${p.label} ${m.label}`]))
 );
 
 // ── Reusable toggle switch ──────────────────────────────────────
@@ -114,10 +112,10 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [history, setHistory] = useState<ReviewHistoryEntry[]>([]);
 
   useEffect(() => {
-    window.electronAPI.getAuthState().then(({ authenticated, login }) => {
+    void window.electronAPI.getAuthState().then(({ authenticated, login }) => {
       setAuthStatus(authenticated && login ? { login } : 'unauthenticated');
     });
-    window.electronAPI.listReviews().then(setHistory);
+    void window.electronAPI.listReviews().then(setHistory);
   }, []);
 
   async function handleSignIn() {
@@ -138,7 +136,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     setAuthStatus('unauthenticated');
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!prUrl.trim()) return;
 
@@ -166,7 +164,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
         signalBoost,
         smartImports,
       });
-      window.electronAPI.listReviews().then(setHistory);
+      void window.electronAPI.listReviews().then(setHistory);
       onReviewReady(review);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
@@ -236,9 +234,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
             )}
             <Card>
               <CardContent className="pt-6 flex flex-col gap-3 items-center text-center">
-                <p className="text-sm text-muted-foreground">
-                  Sign in with GitHub to generate PR reviews.
-                </p>
+                <p className="text-sm text-muted-foreground">Sign in with GitHub to generate PR reviews.</p>
                 <Button onClick={handleSignIn} className="w-full">
                   Sign in with GitHub
                 </Button>
@@ -291,8 +287,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
 
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="instructions" className="text-sm font-medium">
-                    Instructions{' '}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
+                    Instructions <span className="text-muted-foreground font-normal">(optional)</span>
                   </label>
                   <textarea
                     id="instructions"
@@ -404,7 +399,8 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                           <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                             <span className="text-sm font-medium truncate">{entry.prTitle}</span>
                             <span className="text-xs text-muted-foreground truncate">
-                              {entry.author} · {entry.model ? MODEL_LABELS[entry.model] ?? entry.model : 'Unknown'} · {timeAgo(entry.savedAt)}
+                              {entry.author} · {entry.model ? (MODEL_LABELS[entry.model] ?? entry.model) : 'Unknown'} ·{' '}
+                              {timeAgo(entry.savedAt)}
                             </span>
                           </div>
                           <Badge variant="outline" className={`shrink-0 text-xs ${risk.className}`}>

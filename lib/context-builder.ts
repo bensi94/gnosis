@@ -20,7 +20,7 @@ function truncateFileContent(content: string, maxLines: number): string {
 function expandDiffContext(
   diff: string,
   fileContents: Record<string, string>,
-  targetContext = DIFF_CONTEXT_LINES,
+  targetContext = DIFF_CONTEXT_LINES
 ): string {
   const result: string[] = [];
   let currentBasePath: string | null = null;
@@ -52,6 +52,7 @@ function expandDiffContext(
 
     // Hunk header: @@ -baseStart[,baseCount] +headStart[,headCount] @@ [suffix]
     const match = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)/);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Record index may be undefined at runtime
     const fileLines = currentBasePath ? fileContents[currentBasePath]?.split('\n') : undefined;
 
     if (!match || !fileLines) {
@@ -60,11 +61,11 @@ function expandDiffContext(
       continue;
     }
 
-    const baseStart  = parseInt(match[1]);
-    const baseCount  = match[2] !== undefined ? parseInt(match[2]) : 1;
-    const headStart  = parseInt(match[3]);
-    const headCount  = match[4] !== undefined ? parseInt(match[4]) : 1;
-    const suffix     = match[5]; // e.g. " function foo() {"
+    const baseStart = parseInt(match[1]);
+    const baseCount = parseInt(match[2]) || 1;
+    const headStart = parseInt(match[3]);
+    const headCount = parseInt(match[4]) || 1;
+    const suffix = match[5]; // e.g. " function foo() {"
 
     // Collect hunk body
     i++;
@@ -78,21 +79,27 @@ function expandDiffContext(
 
     // Count existing leading/trailing context lines
     let leadCtx = 0;
-    for (const bl of body) { if (bl.startsWith(' ')) leadCtx++; else break; }
+    for (const bl of body) {
+      if (bl.startsWith(' ')) leadCtx++;
+      else break;
+    }
     let trailCtx = 0;
-    for (let j = body.length - 1; j >= 0; j--) { if (body[j].startsWith(' ')) trailCtx++; else break; }
+    for (let j = body.length - 1; j >= 0; j--) {
+      if (body[j].startsWith(' ')) trailCtx++;
+      else break;
+    }
 
     // --- Prepend extra leading context ---
-    const extraLead   = Math.max(0, targetContext - leadCtx);
-    const hunkStart0  = baseStart - 1;          // 0-indexed first line of existing hunk
+    const extraLead = Math.max(0, targetContext - leadCtx);
+    const hunkStart0 = baseStart - 1; // 0-indexed first line of existing hunk
     const prependFrom = Math.max(0, hunkStart0 - extraLead);
-    const prepend     = fileLines.slice(prependFrom, hunkStart0).map(l => ' ' + l);
+    const prepend = fileLines.slice(prependFrom, hunkStart0).map((l) => ' ' + l);
 
     // --- Append extra trailing context ---
-    const extraTrail  = Math.max(0, targetContext - trailCtx);
-    const hunkEnd0    = hunkStart0 + baseCount;  // exclusive, 0-indexed
-    const appendTo    = Math.min(fileLines.length, hunkEnd0 + extraTrail);
-    const append      = fileLines.slice(hunkEnd0, appendTo).map(l => ' ' + l);
+    const extraTrail = Math.max(0, targetContext - trailCtx);
+    const hunkEnd0 = hunkStart0 + baseCount; // exclusive, 0-indexed
+    const appendTo = Math.min(fileLines.length, hunkEnd0 + extraTrail);
+    const append = fileLines.slice(hunkEnd0, appendTo).map((l) => ' ' + l);
 
     // --- Rebuild hunk header ---
     const newBaseStart = prependFrom + 1;

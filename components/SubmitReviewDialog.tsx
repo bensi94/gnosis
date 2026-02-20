@@ -23,15 +23,7 @@ interface Props {
   onSubmit: (event: ReviewEvent, body: string) => Promise<{ reviewUrl: string; droppedCommentCount: number }>;
 }
 
-export function SubmitReviewDialog({
-  open,
-  onOpenChange,
-  comments,
-  prUrl,
-  headSha,
-  isOwnPr,
-  onSubmit,
-}: Props) {
+export function SubmitReviewDialog({ open, onOpenChange, comments, headSha, isOwnPr, onSubmit }: Props) {
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +34,12 @@ export function SubmitReviewDialog({
   // Group comments by file for the summary
   const fileGroups = new Map<string, PendingReviewComment[]>();
   for (const c of comments) {
-    if (!fileGroups.has(c.filePath)) fileGroups.set(c.filePath, []);
-    fileGroups.get(c.filePath)!.push(c);
+    const existing = fileGroups.get(c.filePath);
+    if (existing) {
+      existing.push(c);
+    } else {
+      fileGroups.set(c.filePath, [c]);
+    }
   }
 
   async function handleSubmit(event: ReviewEvent) {
@@ -87,9 +83,8 @@ export function SubmitReviewDialog({
             <div className="flex items-start gap-2 rounded-md border border-yellow-800/50 bg-yellow-950/30 p-3 text-sm text-yellow-200">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-yellow-500" />
               <span>
-                {droppedCount} comment{droppedCount !== 1 ? 's were' : ' was'} on lines outside
-                the diff range and {droppedCount !== 1 ? 'were' : 'was'} included in the review
-                body instead.
+                {droppedCount} comment{droppedCount !== 1 ? 's were' : ' was'} on lines outside the diff range and{' '}
+                {droppedCount !== 1 ? 'were' : 'was'} included in the review body instead.
               </span>
             </div>
           )}
@@ -117,8 +112,8 @@ export function SubmitReviewDialog({
         <DialogHeader>
           <DialogTitle>Submit review</DialogTitle>
           <DialogDescription>
-            {comments.length} comment{comments.length !== 1 ? 's' : ''} across{' '}
-            {fileGroups.size} file{fileGroups.size !== 1 ? 's' : ''}
+            {comments.length} comment{comments.length !== 1 ? 's' : ''} across {fileGroups.size} file
+            {fileGroups.size !== 1 ? 's' : ''}
           </DialogDescription>
         </DialogHeader>
 
@@ -126,7 +121,8 @@ export function SubmitReviewDialog({
           <div className="flex items-start gap-2 rounded-md border border-yellow-800/50 bg-yellow-950/30 p-3 text-sm text-yellow-200">
             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-yellow-500" />
             <span>
-              This review was loaded from history without a commit reference. Line comments may land on wrong lines if the PR has been updated.
+              This review was loaded from history without a commit reference. Line comments may land on wrong lines if
+              the PR has been updated.
             </span>
           </div>
         )}
@@ -170,9 +166,7 @@ export function SubmitReviewDialog({
           />
         </div>
 
-        {error && (
-          <p className="text-sm text-destructive">{error}</p>
-        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
         <DialogFooter className="flex-col gap-2 sm:flex-col sm:gap-2">
           {isOwnPr && (

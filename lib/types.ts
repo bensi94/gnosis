@@ -1,11 +1,4 @@
-export type SlideType =
-  | 'foundation'
-  | 'feature'
-  | 'refactor'
-  | 'bugfix'
-  | 'test'
-  | 'config'
-  | 'docs';
+export type SlideType = 'foundation' | 'feature' | 'refactor' | 'bugfix' | 'test' | 'config' | 'docs';
 
 export interface DiffHunk {
   filePath: string;
@@ -78,10 +71,7 @@ export interface ReviewHistoryEntry {
 
 export type Provider = 'claude' | 'gemini';
 
-export type ClaudeModel =
-  | 'claude-opus-4-6'
-  | 'claude-sonnet-4-6'
-  | 'claude-haiku-4-5-20251001';
+export type ClaudeModel = 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
 
 export type GeminiModel =
   | 'gemini-3.1-pro-preview'
