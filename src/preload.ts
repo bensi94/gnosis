@@ -8,6 +8,7 @@ import type {
   ReviewHistoryEntry,
   SubmitReviewRequest,
   FreshnessResult,
+  UpdateInfo,
 } from '../lib/types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -36,4 +37,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   searchPullRequests: (): Promise<PrSearchResult[]> => ipcRenderer.invoke('search-pull-requests'),
   reRenderHunks: (review: ReviewGuide): Promise<ReviewGuide> => ipcRenderer.invoke('re-render-hunks', review),
   getPrStatus: (prUrl: string): Promise<PrStatus> => ipcRenderer.invoke('get-pr-status', prUrl),
+  onUpdateAvailable: (callback: (info: UpdateInfo) => void): void => {
+    ipcRenderer.on('update-available', (_event, info: UpdateInfo) => callback(info));
+  },
+  offUpdateAvailable: (): void => {
+    ipcRenderer.removeAllListeners('update-available');
+  },
+  dismissUpdate: (version: string): Promise<void> => ipcRenderer.invoke('dismiss-update', version),
+  openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),
 });

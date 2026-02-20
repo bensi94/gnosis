@@ -170,6 +170,13 @@ export interface PrSearchResult {
   role: 'author' | 'review-requested';
 }
 
+export interface UpdateInfo {
+  version: string;
+  releaseUrl: string;
+  releaseName: string;
+  publishedAt: string;
+}
+
 export interface PrMetadata {
   title: string;
   description: string;

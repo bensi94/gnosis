@@ -18,6 +18,7 @@ import {
 import type { CiCheck, PrStatus } from '../lib/types';
 import { buildContextPackage } from '../lib/context-builder';
 import { generateReviewGuide } from '../lib/agent';
+import { checkForUpdate } from '../lib/updater';
 import { renderDiffHunk, inferLanguage, reRenderAllHunks } from '../lib/highlight';
 import { parsePatchValidLines } from '../lib/diff-lines';
 import type {
@@ -249,11 +250,45 @@ function createWindow() {
   }
 }
 
+// ── Update check helpers ─────────────────────────────────────
+
+function getDismissedUpdatePath() {
+  return path.join(app.getPath('userData'), 'update-dismissed.json');
+}
+
+function getDismissedVersion(): string | null {
+  try {
+    const data = JSON.parse(fs.readFileSync(getDismissedUpdatePath(), 'utf-8')) as { version?: string };
+    return data.version ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function setDismissedVersion(version: string) {
+  fs.writeFileSync(getDismissedUpdatePath(), JSON.stringify({ version }));
+}
+
+async function runUpdateCheck() {
+  const update = await checkForUpdate(app.getVersion());
+  if (!update) return;
+  if (getDismissedVersion() === update.version) return;
+
+  const windows = BrowserWindow.getAllWindows();
+  for (const win of windows) {
+    win.webContents.send('update-available', update);
+  }
+}
+
 void app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  // Check for updates after 5s, then every 4 hours
+  setTimeout(() => void runUpdateCheck(), 5_000);
+  setInterval(() => void runUpdateCheck(), 4 * 60 * 60 * 1_000);
 });
 
 app.on('window-all-closed', () => {
@@ -337,6 +372,14 @@ function savePreferences(prefs: Preferences): void {
 }
 
 // ── IPC handlers ────────────────────────────────────────────────
+
+ipcMain.handle('dismiss-update', (_event, version: string) => {
+  setDismissedVersion(version);
+});
+
+ipcMain.handle('open-external', (_event, url: string) => {
+  void shell.openExternal(url);
+});
 
 // Backward-compat shim — renderer still calls getConfig to check if signed in
 ipcMain.handle('get-config', () => {

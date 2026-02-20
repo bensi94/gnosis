@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { TooltipProvider } from '../components/ui/tooltip';
 import { HomePage } from './pages/HomePage';
 import { ReviewPage } from './pages/ReviewPage';
+import { UpdateBanner } from '../components/UpdateBanner';
 import { applyCodeFont } from '../components/SettingsDialog';
 import type { ReviewGuide } from '../lib/types';
 
@@ -36,9 +37,12 @@ export function App() {
   }
 
   return (
-    <TooltipProvider>
-      {page === 'home' && <HomePage onReviewReady={handleReviewReady} prefillPrUrl={prefillPrUrl} />}
-      {page === 'review' && review && <ReviewPage review={review} onBack={handleBack} onReReview={handleReReview} />}
-    </TooltipProvider>
+    <>
+      <UpdateBanner />
+      <TooltipProvider>
+        {page === 'home' && <HomePage onReviewReady={handleReviewReady} prefillPrUrl={prefillPrUrl} />}
+        {page === 'review' && review && <ReviewPage review={review} onBack={handleBack} onReReview={handleReReview} />}
+      </TooltipProvider>
+    </>
   );
 }
