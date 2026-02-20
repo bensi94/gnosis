@@ -190,8 +190,15 @@ function InteractiveHunk({
   const lineHtmls = useMemo(() => parseShikiLines(hunk.renderedHtml), [hunk.renderedHtml]);
   const shikiStyles = useMemo(() => extractShikiStyles(hunk.renderedHtml), [hunk.renderedHtml]);
 
-  // If we can't parse the HTML, fall back to non-interactive rendering
-  if (!lineHtmls || lineHtmls.length !== lineInfos.length) {
+  // Fall back to non-interactive rendering if we can't align parsed lines with HTML.
+  // Allow lineHtmls to have trailing extra elements (Shiki may add a trailing empty line span).
+  if (!lineHtmls || lineInfos.length === 0 || lineHtmls.length < lineInfos.length) {
+    if (lineHtmls && lineInfos.length > 0) {
+      console.warn(
+        `[InteractiveDiffHunk] Line count mismatch for ${filePath}: ` +
+          `parsed=${lineInfos.length} html=${lineHtmls.length}, falling back to non-interactive`
+      );
+    }
     return <div dangerouslySetInnerHTML={{ __html: hunk.renderedHtml }} />;
   }
 

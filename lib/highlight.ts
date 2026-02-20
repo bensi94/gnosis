@@ -117,6 +117,11 @@ export async function renderDiffHunk(
     }
   }
 
+  // Empty content: return minimal HTML to avoid Shiki producing a single empty line span
+  if (codeLines.length === 0) {
+    return '<pre class="shiki"><code></code></pre>';
+  }
+
   const hasDiff = diffTypes.some((t) => t !== 'context');
 
   const diffTransformer: ShikiTransformer = {
