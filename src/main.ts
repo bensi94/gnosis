@@ -477,6 +477,16 @@ ipcMain.handle('delete-review', (_event, id: string) => {
   fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
 });
 
+ipcMain.handle('delete-all-reviews', () => {
+  const dir = getReviewsDir();
+  if (fs.existsSync(dir)) {
+    for (const file of fs.readdirSync(dir)) {
+      if (file.endsWith('.json')) fs.unlinkSync(path.join(dir, file));
+    }
+  }
+  fs.writeFileSync(getReviewsIndexPath(), JSON.stringify([], null, 2));
+});
+
 ipcMain.handle(
   'check-pr-freshness',
   async (_event, prUrl: string, headSha: string | undefined): Promise<FreshnessResult> => {
@@ -662,7 +672,7 @@ ipcMain.handle(
           hunk.language = inferLanguage(hunk.filePath);
         }
         try {
-          hunk.renderedHtml = await renderDiffHunk(hunk.content, hunk.language, codeTheme);
+          hunk.renderedHtml = await renderDiffHunk(hunk.content, hunk.language, codeTheme, hunk.hunkHeader);
         } catch (err) {
           console.warn(`[main] Failed to render hunk for ${hunk.filePath}:`, err);
           hunk.renderedHtml = `<pre class="diff-block">${hunk.content}</pre>`;

@@ -8,40 +8,77 @@ export interface DiffLineInfo {
 }
 
 /**
+ * Detect whether the content string has unified diff prefix markers on every
+ * non-empty line (`+`, `-`, or ` `). Returns false on the first line that
+ * doesn't start with one of these characters.
+ */
+export function contentHasDiffMarkers(content: string): boolean {
+  const lines = content.split('\n');
+  let nonEmptyCount = 0;
+  for (const line of lines) {
+    if (line === '') continue;
+    nonEmptyCount++;
+    const ch = line[0];
+    if (ch !== '+' && ch !== '-' && ch !== ' ') return false;
+  }
+  return nonEmptyCount > 0;
+}
+
+/**
  * Parse a hunk header and its content lines into per-line metadata.
  *
  * The hunk header format is: @@ -oldStart,oldCount +newStart,newCount @@
  * Content lines are prefixed with '+' (add), '-' (remove), or ' ' (context).
  *
+ * When the AI omits diff prefix markers, the function detects this and treats
+ * every line as full text. For new-file hunks (oldCount === 0) lines are
+ * treated as additions; otherwise they are treated as context.
+ *
  * This mirrors the same line-splitting logic used by renderDiffHunk in
  * lib/highlight.ts so that indices stay aligned with the rendered Shiki HTML.
  */
 export function parseDiffLines(hunkHeader: string, content: string): DiffLineInfo[] {
-  const match = hunkHeader.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+  const match = hunkHeader.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
   if (!match) return [];
 
   let oldLine = parseInt(match[1], 10);
-  let newLine = parseInt(match[2], 10);
+  let newLine = parseInt(match[3], 10);
+
+  const hasMarkers = contentHasDiffMarkers(content);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- regex optional group can be undefined at runtime
+  const oldCount = match[2] !== undefined ? parseInt(match[2], 10) : 1;
+  const isNewFile = oldLine === 0 && oldCount === 0;
 
   const result: DiffLineInfo[] = [];
 
   for (const line of content.split('\n')) {
     if (line === '') continue;
 
-    const prefix = line[0];
-    const text = line.slice(1);
+    if (hasMarkers) {
+      const prefix = line[0];
+      const text = line.slice(1);
 
-    if (prefix === '+') {
-      result.push({ lineNumber: newLine, side: 'RIGHT', type: 'add', text });
-      newLine++;
-    } else if (prefix === '-') {
-      result.push({ lineNumber: oldLine, side: 'LEFT', type: 'remove', text });
-      oldLine++;
+      if (prefix === '+') {
+        result.push({ lineNumber: newLine, side: 'RIGHT', type: 'add', text });
+        newLine++;
+      } else if (prefix === '-') {
+        result.push({ lineNumber: oldLine, side: 'LEFT', type: 'remove', text });
+        oldLine++;
+      } else {
+        result.push({ lineNumber: newLine, side: 'RIGHT', type: 'context', text });
+        oldLine++;
+        newLine++;
+      }
     } else {
-      // Context lines exist on both sides; use RIGHT (new file) for commenting
-      result.push({ lineNumber: newLine, side: 'RIGHT', type: 'context', text });
-      oldLine++;
-      newLine++;
+      // No diff markers — use full line text
+      if (isNewFile) {
+        result.push({ lineNumber: newLine, side: 'RIGHT', type: 'add', text: line });
+        newLine++;
+      } else {
+        result.push({ lineNumber: newLine, side: 'RIGHT', type: 'context', text: line });
+        oldLine++;
+        newLine++;
+      }
     }
   }
 
