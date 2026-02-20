@@ -65,6 +65,7 @@ export const claudeProvider: LLMProvider = {
         '',
         '--output-format',
         'stream-json',
+        '--verbose',
         '--include-partial-messages',
         '--no-session-persistence',
         ...(thinking ? ['--effort', 'high'] : []),
