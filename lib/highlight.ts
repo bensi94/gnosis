@@ -1,5 +1,6 @@
 import { createHighlighter, type Highlighter, type ShikiTransformer } from 'shiki';
 import { CODE_THEMES } from './constants';
+import { contentHasDiffMarkers } from './diff-lines';
 import type { ReviewGuide } from './types';
 
 let highlighterInstance: Highlighter | null = null;
@@ -77,7 +78,12 @@ const SUPPORTED_LANGUAGES = new Set([
  * we track the diff type for each line by position and apply classes directly
  * via a custom ShikiTransformer. This works for every language.
  */
-export async function renderDiffHunk(content: string, language: string, theme = 'aurora-x'): Promise<string> {
+export async function renderDiffHunk(
+  content: string,
+  language: string,
+  theme = 'aurora-x',
+  hunkHeader?: string
+): Promise<string> {
   const highlighter = await getHighlighter();
   const lang = SUPPORTED_LANGUAGES.has(language) ? language : 'text';
 
@@ -85,11 +91,30 @@ export async function renderDiffHunk(content: string, language: string, theme = 
   const diffTypes: DiffType[] = [];
   const codeLines: string[] = [];
 
+  const hasMarkers = contentHasDiffMarkers(content);
+
+  // When markers are absent, infer diff type from hunk header
+  let fallbackType: DiffType = 'context';
+  if (!hasMarkers && hunkHeader) {
+    const m = hunkHeader.match(/@@ -(\d+)(?:,(\d+))? \+/);
+    if (m) {
+      const oldStart = parseInt(m[1], 10);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- regex optional group can be undefined at runtime
+      const oldCount = m[2] !== undefined ? parseInt(m[2], 10) : 1;
+      if (oldStart === 0 && oldCount === 0) fallbackType = 'add';
+    }
+  }
+
   for (const line of content.split('\n')) {
     if (line === '') continue;
-    const prefix = line[0];
-    diffTypes.push(prefix === '+' ? 'add' : prefix === '-' ? 'remove' : 'context');
-    codeLines.push(line.slice(1));
+    if (hasMarkers) {
+      const prefix = line[0];
+      diffTypes.push(prefix === '+' ? 'add' : prefix === '-' ? 'remove' : 'context');
+      codeLines.push(line.slice(1));
+    } else {
+      diffTypes.push(fallbackType);
+      codeLines.push(line);
+    }
   }
 
   const hasDiff = diffTypes.some((t) => t !== 'context');
@@ -155,7 +180,7 @@ export async function reRenderAllHunks(review: ReviewGuide, theme: string): Prom
   for (const slide of review.slides) {
     for (const hunk of slide.diffHunks) {
       try {
-        hunk.renderedHtml = await renderDiffHunk(hunk.content, hunk.language, theme);
+        hunk.renderedHtml = await renderDiffHunk(hunk.content, hunk.language, theme, hunk.hunkHeader);
       } catch (err) {
         console.warn(`[highlight] Failed to re-render hunk for ${hunk.filePath}:`, err);
       }

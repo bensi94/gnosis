@@ -60,7 +60,7 @@ You are given:
 
 Use file_contents_before and file_contents_after to understand the full shape of each changed file, not just the lines in the diff. Reference surrounding functions, types, and patterns when writing narratives to give the reviewer genuine codebase context.
 
-When generating diffHunks.content, include 10 lines of context before and after each change. Draw from the file contents if the diff context is shorter.
+When generating diffHunks.content, use unified diff format: each line MUST start with '+' (added), '-' (removed), or ' ' (space, for context). Include 10 lines of context before and after each change. Draw from the file contents if the diff context is shorter.
 
 You must respond with valid JSON matching the ReviewGuide schema exactly. No explanation outside the JSON.`;
 
