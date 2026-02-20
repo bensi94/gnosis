@@ -1,5 +1,5 @@
 import { getProvider } from './provider';
-import type { ReviewGuide } from './types';
+import type { ModelId, Provider, ReviewGuide } from './types';
 
 // ── System prompt & schema constants ─────────────────────────────
 
@@ -143,8 +143,8 @@ function validateReviewGuide(obj: unknown): obj is ReviewGuide {
 export async function generateReviewGuide(
   contextPackage: string,
   prUrl: string,
-  providerName: string,
-  model: string,
+  providerName: Provider,
+  model: ModelId,
   instructions?: string,
   onChunk?: (chunk: string, isThinking: boolean) => void,
   thinking: boolean = false,

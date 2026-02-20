@@ -1,6 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { getProvider } from './provider';
-import type { ChangedFile, PrMetadata } from './types';
+import type { ChangedFile, PrMetadata, Provider } from './types';
 
 export function parsePrUrl(url: string): { owner: string; repo: string; pullNumber: number } {
   const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/pulls?\/(\d+)/);
@@ -148,7 +148,7 @@ Rules:
 async function extractImportsWithLLM(
   changedFileContents: Record<string, string>,
   changedFilePaths: string[],
-  providerName: string,
+  providerName: Provider,
 ): Promise<string[]> {
   const fileEntries = changedFilePaths
     .filter((p) => changedFileContents[p])
@@ -188,7 +188,7 @@ export async function getNeighborFiles(
   changedFilePaths: string[],
   changedFileContents: Record<string, string>,
   ref: string,
-  smartImportsProvider?: string,
+  smartImportsProvider?: Provider,
 ): Promise<Record<string, string>> {
   if (smartImportsProvider) {
     console.log(`[github] Using smart (${smartImportsProvider}) import extraction`);

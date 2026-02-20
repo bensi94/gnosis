@@ -1,15 +1,16 @@
 import { claudeProvider } from './providers/claude';
 import { geminiProvider } from './providers/gemini';
+import type { ModelId, Provider } from './types';
 
 export interface LLMProvider {
-  name: string;
-  models: { id: string; label: string; quick?: boolean }[];
+  name: Provider;
+  models: { id: ModelId; label: string; quick?: boolean }[];
 
   /** Streaming call — used for review generation */
   generate(opts: {
     content: string;
     systemPrompt: string;
-    model: string;
+    model: ModelId;
     thinking: boolean;
     onChunk?: (chunk: string, isThinking: boolean) => void;
   }): Promise<string>;
@@ -18,17 +19,15 @@ export interface LLMProvider {
   quick(opts: {
     content: string;
     systemPrompt: string;
-    model: string;
+    model: ModelId;
   }): Promise<string>;
 }
 
-const providers: Record<string, LLMProvider> = {
+const providers: Record<Provider, LLMProvider> = {
   claude: claudeProvider,
   gemini: geminiProvider,
 };
 
-export function getProvider(name: string): LLMProvider {
-  const provider = providers[name];
-  if (!provider) throw new Error(`Unknown provider: ${name}`);
-  return provider;
+export function getProvider(name: Provider): LLMProvider {
+  return providers[name];
 }

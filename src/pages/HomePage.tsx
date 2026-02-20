@@ -4,7 +4,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { LoadingScreen } from '../../components/LoadingScreen';
-import type { ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
+import type { ModelId, Provider, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
 import { timeAgo } from '../../lib/utils';
 
 interface Props {
@@ -51,8 +51,8 @@ for (const p of Object.values(PROVIDERS)) {
 export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [prUrl, setPrUrl] = useState(prefillPrUrl ?? '');
-  const [provider, setProvider] = useState<'claude' | 'gemini'>('claude');
-  const [model, setModel] = useState('claude-opus-4-6');
+  const [provider, setProvider] = useState<Provider>('claude');
+  const [model, setModel] = useState<ModelId>('claude-opus-4-6');
   const [thinking, setThinking] = useState(false);
   const [signalBoost, setSignalBoost] = useState(false);
   const [smartImports, setSmartImports] = useState(false);

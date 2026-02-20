@@ -16,7 +16,7 @@ import { buildContextPackage } from '../lib/context-builder';
 import { generateReviewGuide } from '../lib/agent';
 import { renderDiffHunk, inferLanguage } from '../lib/highlight';
 import { parsePatchValidLines } from '../lib/diff-lines';
-import type { GenerateReviewRequest, ReviewGuide, ReviewHistoryEntry, SubmitReviewRequest, FreshnessResult } from '../lib/types';
+import type { GenerateReviewRequest, ModelId, ReviewGuide, ReviewHistoryEntry, SubmitReviewRequest, FreshnessResult } from '../lib/types';
 
 // Injected by Electron Forge Vite plugin
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -263,7 +263,7 @@ function readReviewsIndex(): ReviewHistoryEntry[] {
   }
 }
 
-function saveReviewToHistory(review: ReviewGuide, model?: string): void {
+function saveReviewToHistory(review: ReviewGuide, model?: ModelId): void {
   ensureReviewsDir();
   const id = Date.now().toString();
   const savedAt = new Date().toISOString();
