@@ -158,7 +158,8 @@ async function extractImportsWithLLM(
   if (!fileEntries) return [];
 
   const provider = getProvider(providerName);
-  const quickModel = provider.models.find((m) => m.quick)?.id ?? provider.models[0].id;
+  const quickEntry = provider.models.find((m) => m.quick) ?? provider.models[0];
+  const quickModel = quickEntry.id;
 
   try {
     const result = await provider.quick({

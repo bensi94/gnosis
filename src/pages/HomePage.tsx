@@ -41,12 +41,61 @@ const PROVIDERS = {
   },
 } as const;
 
-const MODEL_LABELS: Record<string, string> = {};
-for (const p of Object.values(PROVIDERS)) {
-  for (const m of p.models) {
-    MODEL_LABELS[m.id] = `${p.label} ${m.label}`;
-  }
+const MODEL_LABELS: Record<string, string> = Object.fromEntries(
+  Object.values(PROVIDERS).flatMap((p) =>
+    p.models.map((m) => [m.id, `${p.label} ${m.label}`]),
+  ),
+);
+
+// ── Reusable toggle switch ──────────────────────────────────────
+
+interface ToggleSwitchProps {
+  id: string;
+  label: string;
+  description: string;
+  checked: boolean;
+  onToggle: () => void;
+  badge?: string;
 }
+
+function ToggleSwitch({ id, label, description, checked, onToggle, badge }: ToggleSwitchProps) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-0.5">
+        <label htmlFor={id} className="text-sm font-medium">
+          {label}
+          {badge && (
+            <>
+              {' '}
+              <span className="ml-1 inline-block rounded bg-amber-900/60 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 leading-none align-middle">
+                {badge}
+              </span>
+            </>
+          )}
+        </label>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <button
+        id={id}
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={onToggle}
+        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          checked ? 'bg-primary' : 'bg-input'
+        }`}
+      >
+        <span
+          className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
+            checked ? 'translate-x-4' : 'translate-x-0'
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+// ── Main page ───────────────────────────────────────────────────
 
 export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
@@ -144,6 +193,12 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     setHistory((prev) => prev.filter((h) => h.id !== id));
   }
 
+  function handleProviderChange(p: Provider) {
+    setProvider(p);
+    setModel(PROVIDERS[p].models[0].id);
+    if (p === 'gemini') setThinking(false);
+  }
+
   if (loading) {
     return (
       <LoadingScreen
@@ -214,7 +269,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
           </div>
         )}
 
-        {/* PR form — only shown when authenticated */}
+        {/* PR form -- only shown when authenticated */}
         {isAuthenticated && (
           <Card>
             <CardContent className="pt-6">
@@ -256,11 +311,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                       <button
                         key={p}
                         type="button"
-                        onClick={() => {
-                          setProvider(p);
-                          setModel(PROVIDERS[p].models[0].id);
-                          if (p === 'gemini') setThinking(false);
-                        }}
+                        onClick={() => handleProviderChange(p)}
                         className={`flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors ${
                           provider === p
                             ? 'border-primary bg-primary text-primary-foreground'
@@ -294,91 +345,32 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                 </div>
 
                 {provider === 'claude' && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col gap-0.5">
-                      <label htmlFor="thinking" className="text-sm font-medium">Extended thinking</label>
-                      <p className="text-xs text-muted-foreground">
-                        {thinking ? 'Deeper reasoning · slower' : 'Standard speed'}
-                      </p>
-                    </div>
-                    <button
-                      id="thinking"
-                      type="button"
-                      role="switch"
-                      aria-checked={thinking}
-                      onClick={() => setThinking((t) => !t)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                        thinking ? 'bg-primary' : 'bg-input'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                          thinking ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
+                  <ToggleSwitch
+                    id="thinking"
+                    label="Extended thinking"
+                    description={thinking ? 'Deeper reasoning · slower' : 'Standard speed'}
+                    checked={thinking}
+                    onToggle={() => setThinking((t) => !t)}
+                  />
                 )}
 
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5">
-                    <label htmlFor="signal-boost" className="text-sm font-medium">
-                      Signal boost{' '}
-                      <span className="ml-1 inline-block rounded bg-amber-900/60 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 leading-none align-middle">
-                        Experimental
-                      </span>
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Skip trivial changes, focus on design and complexity
-                    </p>
-                  </div>
-                  <button
-                    id="signal-boost"
-                    type="button"
-                    role="switch"
-                    aria-checked={signalBoost}
-                    onClick={() => setSignalBoost((s) => !s)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      signalBoost ? 'bg-primary' : 'bg-input'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                        signalBoost ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
+                <ToggleSwitch
+                  id="signal-boost"
+                  label="Signal boost"
+                  description="Skip trivial changes, focus on design and complexity"
+                  checked={signalBoost}
+                  onToggle={() => setSignalBoost((s) => !s)}
+                  badge="Experimental"
+                />
 
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-0.5">
-                    <label htmlFor="smart-imports" className="text-sm font-medium">
-                      Smart imports{' '}
-                      <span className="ml-1 inline-block rounded bg-amber-900/60 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 leading-none align-middle">
-                        Experimental
-                      </span>
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Use AI to find related files across all languages
-                    </p>
-                  </div>
-                  <button
-                    id="smart-imports"
-                    type="button"
-                    role="switch"
-                    aria-checked={smartImports}
-                    onClick={() => setSmartImports((s) => !s)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      smartImports ? 'bg-primary' : 'bg-input'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                        smartImports ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
+                <ToggleSwitch
+                  id="smart-imports"
+                  label="Smart imports"
+                  description="Use AI to find related files across all languages"
+                  checked={smartImports}
+                  onToggle={() => setSmartImports((s) => !s)}
+                  badge="Experimental"
+                />
 
                 {error && (
                   <Alert variant="destructive">

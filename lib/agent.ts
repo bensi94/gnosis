@@ -120,6 +120,7 @@ You must apply these rules on top of all other guidelines:
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+/** Strip markdown fences or surrounding text, returning just the JSON object. */
 function extractJson(text: string): string {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
