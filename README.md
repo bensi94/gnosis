@@ -28,6 +28,12 @@ Or download manually from [GitHub Releases](https://github.com/oddur/gnosis/rele
 xattr -cr /Applications/Gnosis.app
 ```
 
+## Update
+
+```bash
+brew update && brew upgrade --cask gnosis
+```
+
 On first launch, click **Connect GitHub** to authenticate via OAuth. Alternatively, set `GITHUB_TOKEN` in your environment — it takes precedence over OAuth.
 
 ## Usage
