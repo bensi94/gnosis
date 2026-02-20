@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowUpCircle, X, Copy, Check } from 'lucide-react';
 import type { UpdateInfo } from '../lib/types';
 
-const BREW_COMMAND = 'brew upgrade --cask gnosis';
+const BREW_COMMAND = 'brew update && brew upgrade --cask gnosis';
 
 export function UpdateBanner() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
