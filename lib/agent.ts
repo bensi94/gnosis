@@ -254,6 +254,57 @@ function callClaudeCLI(
   });
 }
 
+export function callClaudeQuick(
+  userContent: string,
+  systemPrompt: string,
+  model: string,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const env = { ...process.env };
+    delete env.CLAUDECODE;
+    env.MAX_THINKING_TOKENS = '0';
+
+    const claudePath = resolveClaudePath();
+    const args = [
+      '-p',
+      '--model', model,
+      '--system-prompt', systemPrompt,
+      '--tools', '',
+      '--output-format', 'text',
+      '--no-session-persistence',
+    ];
+    const proc = spawn(claudePath, args, { env });
+
+    proc.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'ENOENT') {
+        reject(new Error(
+          `Claude Code CLI not found at "${claudePath}". ` +
+          'Install it from claude.ai/code and authenticate with `claude auth`.',
+        ));
+      } else {
+        reject(err);
+      }
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    proc.stdin.write(userContent);
+    proc.stdin.end();
+
+    proc.on('close', (code: number | null) => {
+      if (code === 0) {
+        resolve(stdout.trim());
+      } else {
+        reject(new Error(`Claude CLI exited with code ${code}: ${stderr.slice(0, 300)}`));
+      }
+    });
+  });
+}
+
 function extractJson(text: string): string {
   // Find the first { and last } — works regardless of markdown fences or
   // whether the JSON content itself contains ``` sequences.

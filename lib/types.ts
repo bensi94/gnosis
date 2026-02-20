@@ -39,6 +39,7 @@ export interface ReviewGuide {
   riskRationale: string;
   totalFilesChanged: number;
   totalLinesChanged: number;
+  neighborFileCount?: number;
   slides: Slide[];
   headSha?: string;
 }
@@ -80,6 +81,7 @@ export interface GenerateReviewRequest {
   instructions?: string;
   thinking?: boolean;
   signalBoost?: boolean;
+  smartImports?: boolean;
 }
 
 export interface GenerateReviewResponse {

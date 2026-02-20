@@ -387,7 +387,7 @@ ipcMain.handle('check-pr-freshness', async (_event, prUrl: string, headSha: stri
   }
 });
 
-ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, thinking, signalBoost }: GenerateReviewRequest) => {
+ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, thinking, signalBoost, smartImports }: GenerateReviewRequest) => {
   const token = getResolvedToken();
   const octokit = new Octokit({ auth: token ?? undefined });
 
@@ -427,13 +427,15 @@ ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, t
     ]);
   }
 
+  const allFileContents = { ...fileContents, ...headFileContents };
   const neighborFiles = await getNeighborFiles(
     octokit,
     owner,
     repo,
     changedFiles.map((f) => f.filename),
-    fileContents,
+    allFileContents,
     baseRef,
+    smartImports,
   );
 
   const contextPackage = buildContextPackage(
@@ -463,6 +465,7 @@ ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, t
     (sum, f) => sum + f.additions + f.deletions,
     0,
   );
+  reviewGuide.neighborFileCount = Object.keys(neighborFiles).length;
 
   for (const slide of reviewGuide.slides) {
     for (const hunk of slide.diffHunks) {
