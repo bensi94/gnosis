@@ -1,5 +1,17 @@
 export type SlideType = 'foundation' | 'feature' | 'refactor' | 'bugfix' | 'test' | 'config' | 'docs';
 
+export interface CiCheck {
+  name: string;
+  status: 'queued' | 'in_progress' | 'completed';
+  conclusion: string | null;
+}
+
+export interface ReviewSummary {
+  approved: number;
+  changesRequested: number;
+  commented: number;
+}
+
 export interface DiffHunk {
   filePath: string;
   hunkHeader: string;
@@ -33,8 +45,25 @@ export interface ReviewGuide {
   totalFilesChanged: number;
   totalLinesChanged: number;
   neighborFileCount?: number;
+  generationDurationMs?: number;
   slides: Slide[];
   headSha?: string;
+}
+
+export interface PrStatus {
+  labels: string[];
+  mergeable: boolean | null;
+  isDraft: boolean;
+  ciChecks: CiCheck[];
+  ciConclusion: 'success' | 'failure' | 'pending' | 'neutral';
+  reviewSummary: ReviewSummary;
+  baseBranch: string;
+  commitCount: number;
+  requestedReviewers: string[];
+  requestedTeams: string[];
+  mergeableState: string | null;
+  autoMerge: { method: string } | null;
+  milestone: { title: string; dueOn: string | null } | null;
 }
 
 export type DiffSide = 'LEFT' | 'RIGHT';
@@ -66,6 +95,7 @@ export interface ReviewHistoryEntry {
   author: string;
   riskLevel: 'low' | 'medium' | 'high';
   model?: ModelId;
+  generationDurationMs?: number;
   savedAt: string; // ISO date string
 }
 
@@ -81,6 +111,17 @@ export type GeminiModel =
   | 'gemini-2.5-flash';
 
 export type ModelId = ClaudeModel | GeminiModel;
+
+export interface Preferences {
+  instructions: string;
+  provider: Provider;
+  model: ModelId;
+  thinking: boolean;
+  signalBoost: boolean;
+  smartImports: boolean;
+  codeTheme: string;
+  codeFont: string;
+}
 
 export interface GenerateReviewRequest {
   prUrl: string;
@@ -117,6 +158,18 @@ export type FreshnessResult =
   | { status: 'force-pushed' }
   | { status: 'unknown'; reason: string };
 
+export interface PrSearchResult {
+  number: number;
+  title: string;
+  url: string;
+  repoOwner: string;
+  repoName: string;
+  author: string;
+  updatedAt: string;
+  isDraft: boolean;
+  role: 'author' | 'review-requested';
+}
+
 export interface PrMetadata {
   title: string;
   description: string;
@@ -128,4 +181,13 @@ export interface PrMetadata {
   createdAt: string;
   updatedAt: string;
   url: string;
+  labels: string[];
+  mergeable: boolean | null;
+  isDraft: boolean;
+  commitCount: number;
+  requestedReviewers: string[];
+  requestedTeams: string[];
+  mergeableState: string | null;
+  autoMerge: { method: string } | null;
+  milestone: { title: string; dueOn: string | null } | null;
 }

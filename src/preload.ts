@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
   GenerateReviewRequest,
+  Preferences,
+  PrSearchResult,
+  PrStatus,
   ReviewGuide,
   ReviewHistoryEntry,
   SubmitReviewRequest,
@@ -28,4 +31,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('submit-review', req),
   checkPrFreshness: (prUrl: string, headSha: string | undefined): Promise<FreshnessResult> =>
     ipcRenderer.invoke('check-pr-freshness', prUrl, headSha),
+  loadPreferences: (): Promise<Preferences> => ipcRenderer.invoke('load-preferences'),
+  savePreferences: (prefs: Preferences): Promise<void> => ipcRenderer.invoke('save-preferences', prefs),
+  searchPullRequests: (): Promise<PrSearchResult[]> => ipcRenderer.invoke('search-pull-requests'),
+  reRenderHunks: (review: ReviewGuide): Promise<ReviewGuide> => ipcRenderer.invoke('re-render-hunks', review),
+  getPrStatus: (prUrl: string): Promise<PrStatus> => ipcRenderer.invoke('get-pr-status', prUrl),
 });

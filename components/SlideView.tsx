@@ -1,13 +1,15 @@
 'use client';
 
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
+import { Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { DiffHunkGroup } from '@/components/DiffHunk';
 import { InteractiveDiffHunkGroup } from '@/components/InteractiveDiffHunk';
 import { Markdown } from '@/components/Markdown';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
-import type { Slide, SlideType, DiffHunk, PendingReviewComment, DiffSide } from '@/lib/types';
+import { slideTypeConfig } from '@/lib/constants';
+import type { Slide, DiffHunk, PendingReviewComment, DiffSide } from '@/lib/types';
 
 interface CommentCallbacks {
   onAddComment: (params: {
@@ -31,16 +33,6 @@ interface Props {
   commentCallbacks?: CommentCallbacks;
 }
 
-const slideTypeConfig: Record<SlideType, { label: string; className: string }> = {
-  foundation: { label: 'Foundation', className: 'bg-purple-900 text-purple-200 border-purple-700' },
-  feature: { label: 'Feature', className: 'bg-blue-900 text-blue-200 border-blue-700' },
-  refactor: { label: 'Refactor', className: 'bg-orange-900 text-orange-200 border-orange-700' },
-  bugfix: { label: 'Bug Fix', className: 'bg-red-900 text-red-200 border-red-700' },
-  test: { label: 'Test', className: 'bg-green-900 text-green-200 border-green-700' },
-  config: { label: 'Config', className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
-  docs: { label: 'Docs', className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
-};
-
 // Group hunks by filePath so we can render them under a single file header
 function groupHunksByFile(hunks: DiffHunk[]): { filePath: string; hunks: DiffHunk[] }[] {
   const map = new Map<string, DiffHunk[]>();
@@ -57,6 +49,7 @@ function groupHunksByFile(hunks: DiffHunk[]): { filePath: string; hunks: DiffHun
 
 export function SlideView({ slide, slideNumber, pendingComments, commentCallbacks }: Props) {
   const typeConfig = slideTypeConfig[slide.slideType];
+  const Icon = typeConfig.icon;
   const groupedHunks = groupHunksByFile(slide.diffHunks);
 
   return (
@@ -65,24 +58,24 @@ export function SlideView({ slide, slideNumber, pendingComments, commentCallback
       <Panel defaultSize={40} minSize={25} className="overflow-y-auto min-h-0">
         <div className="p-6 flex flex-col gap-5">
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className={typeConfig.className}>
+            <Badge variant="outline" className={`gap-1 ${typeConfig.className}`}>
+              <Icon className="h-3 w-3" />
               {typeConfig.label}
             </Badge>
           </div>
 
-          <h2 className="text-lg font-semibold leading-tight">{slide.title}</h2>
+          <h2 className="text-lg font-semibold leading-tight font-display">{slide.title}</h2>
 
           <Markdown className="text-sm text-muted-foreground leading-relaxed">{slide.narrative}</Markdown>
 
           {/* Review focus */}
-          <Card className="border">
-            <CardHeader className="pb-2 pt-3 px-4">
-              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">What to check</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-3 px-4">
-              <Markdown className="text-sm">{slide.reviewFocus}</Markdown>
-            </CardContent>
-          </Card>
+          <div className="review-focus-callout rounded-lg border-l-2 border-l-primary bg-primary/[0.06] px-4 py-3">
+            <p className="text-xs uppercase tracking-wider text-primary/70 flex items-center gap-1.5 mb-2">
+              <Eye className="h-3 w-3" />
+              What to check
+            </p>
+            <Markdown className="text-sm review-focus-content">{slide.reviewFocus}</Markdown>
+          </div>
 
           {/* Affected files */}
           {slide.affectedFiles.length > 0 && (

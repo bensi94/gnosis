@@ -1,6 +1,6 @@
 'use client';
 
-import { MessageSquarePlus } from 'lucide-react';
+import { MessageSquarePlus, Presentation, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -21,19 +21,21 @@ export function SlideNav({ current, total, onPrev, onNext, commentCount = 0, onS
 
   return (
     <div className="border-t">
-      <Progress value={progress} className="h-0.5 rounded-none" />
-      <div className="flex items-center justify-between px-6 py-3">
+      <Progress value={progress} className="h-1 rounded-none" />
+      <div className="flex items-center justify-between px-6 py-4">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" onClick={onPrev} disabled={isOverview} size="sm">
-              ← Prev
+            <Button variant="outline" onClick={onPrev} disabled={isOverview} size="sm" className="gap-1">
+              <ChevronLeft className="h-4 w-4" />
+              Prev
             </Button>
           </TooltipTrigger>
           <TooltipContent>Previous slide (←)</TooltipContent>
         </Tooltip>
 
-        <span className="text-sm text-muted-foreground">
-          {isOverview ? 'Overview' : `Slide ${current} of ${total}`}
+        <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+          <Presentation className="h-3.5 w-3.5" />
+          {isOverview ? 'Overview' : `${current} / ${total}`}
         </span>
 
         <div className="flex items-center gap-2">
@@ -50,8 +52,9 @@ export function SlideNav({ current, total, onPrev, onNext, commentCount = 0, onS
           )}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" onClick={onNext} disabled={current >= total} size="sm">
-                Next →
+              <Button variant="outline" onClick={onNext} disabled={current >= total} size="sm" className="gap-1">
+                Next
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Next slide (→)</TooltipContent>

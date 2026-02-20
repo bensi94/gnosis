@@ -1,11 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { LogOut, CircleCheck, Search, SlidersHorizontal, Play, History, Trash2, Settings } from 'lucide-react';
+import { GitHubIcon } from '../../lib/constants';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { LoadingScreen } from '../../components/LoadingScreen';
-import type { ModelId, Provider, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
-import { timeAgo } from '../../lib/utils';
+import { PRPickerDialog } from '../../components/PRPickerDialog';
+import { SettingsDialog } from '../../components/SettingsDialog';
+import { riskConfig } from '../../lib/constants';
+import type { ModelId, Preferences, Provider, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
+import { timeAgo, formatDuration } from '../../lib/utils';
 
 interface Props {
   onReviewReady: (review: ReviewGuide) => void;
@@ -13,12 +18,6 @@ interface Props {
 }
 
 type AuthStatus = 'checking' | 'unauthenticated' | 'signing-in' | { login: string };
-
-const riskConfig = {
-  low: { label: 'Low', className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
-  medium: { label: 'Medium', className: 'bg-blue-900 text-blue-200 border-blue-700' },
-  high: { label: 'High', className: 'bg-red-900 text-red-200 border-red-700' },
-};
 
 const PROVIDERS = {
   claude: {
@@ -65,7 +64,7 @@ function ToggleSwitch({ id, label, description, checked, onToggle, badge }: Togg
           {badge && (
             <>
               {' '}
-              <span className="ml-1 inline-block rounded bg-amber-900/60 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 leading-none align-middle">
+              <span className="ml-1 inline-block rounded bg-teal-900/60 px-1.5 py-0.5 text-[10px] font-medium text-teal-300 leading-none align-middle">
                 {badge}
               </span>
             </>
@@ -100,23 +99,58 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [prUrl, setPrUrl] = useState(prefillPrUrl ?? '');
   const [provider, setProvider] = useState<Provider>('claude');
   const [model, setModel] = useState<ModelId>('claude-opus-4-6');
-  const [thinking, setThinking] = useState(false);
-  const [signalBoost, setSignalBoost] = useState(false);
-  const [smartImports, setSmartImports] = useState(false);
+  const [thinking, setThinking] = useState(true);
+  const [signalBoost, setSignalBoost] = useState(true);
+  const [smartImports, setSmartImports] = useState(true);
   const [instructions, setInstructions] = useState('');
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [isThinkingPhase, setIsThinkingPhase] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [history, setHistory] = useState<ReviewHistoryEntry[]>([]);
+  const [prPickerOpen, setPrPickerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     void window.electronAPI.getAuthState().then(({ authenticated, login }) => {
       setAuthStatus(authenticated && login ? { login } : 'unauthenticated');
     });
     void window.electronAPI.listReviews().then(setHistory);
+    void window.electronAPI.loadPreferences().then((prefs) => {
+      if (prefs.instructions) setInstructions(prefs.instructions);
+      setProvider(prefs.provider);
+      setModel(prefs.model);
+      setThinking(prefs.thinking);
+      setSignalBoost(prefs.signalBoost);
+      setSmartImports(prefs.smartImports);
+      setPrefsLoaded(true);
+    });
   }, []);
+
+  const savePrefs = useCallback(
+    (overrides?: Partial<Preferences>) => {
+      void window.electronAPI.loadPreferences().then((current) => {
+        void window.electronAPI.savePreferences({
+          ...current,
+          instructions,
+          provider,
+          model,
+          thinking,
+          signalBoost,
+          smartImports,
+          ...overrides,
+        });
+      });
+    },
+    [instructions, provider, model, thinking, signalBoost, smartImports]
+  );
+
+  // Auto-save when toggles or model/provider change (skip initial load)
+  useEffect(() => {
+    if (prefsLoaded) savePrefs();
+  }, [prefsLoaded, provider, model, thinking, signalBoost, smartImports, savePrefs]);
 
   async function handleSignIn() {
     setAuthError(null);
@@ -139,6 +173,8 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!prUrl.trim()) return;
+
+    savePrefs();
 
     setStreamingText('');
     setIsThinkingPhase(false);
@@ -210,12 +246,9 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-8">
-      <div className="w-full max-w-lg flex flex-col gap-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">Gnosis</h1>
-          <p className="mt-2 text-muted-foreground">
-            AI-guided code review. Understand the story before you read the diff.
-          </p>
+      <div className="w-full max-w-6xl flex flex-col gap-8">
+        <div className="text-center hero-glow">
+          <h1 className="text-3xl font-bold tracking-tight font-display relative z-10">Gnosis</h1>
         </div>
 
         {/* Auth section */}
@@ -232,10 +265,11 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                 <AlertDescription>{authError}</AlertDescription>
               </Alert>
             )}
-            <Card>
-              <CardContent className="pt-6 flex flex-col gap-3 items-center text-center">
-                <p className="text-sm text-muted-foreground">Sign in with GitHub to generate PR reviews.</p>
-                <Button onClick={handleSignIn} className="w-full">
+            <Card className="max-w-md mx-auto w-full">
+              <CardContent className="flex flex-col gap-3 items-center text-center">
+                <p className="text-sm text-muted-foreground">Sign into your GitHub account</p>
+                <Button onClick={handleSignIn} className="w-full gap-2">
+                  <GitHubIcon className="h-4 w-4" />
                   Sign in with GitHub
                 </Button>
               </CardContent>
@@ -251,175 +285,203 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
           </div>
         )}
 
+        {/* Two-column layout: form + history */}
         {isAuthenticated && (
-          <div className="flex justify-end items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              ✓ Signed in as @{(authStatus as { login: string }).login}
-            </span>
-            <button
-              onClick={handleSignOut}
-              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-            >
-              Sign out
-            </button>
-          </div>
-        )}
-
-        {/* PR form -- only shown when authenticated */}
-        {isAuthenticated && (
-          <Card>
-            <CardContent className="pt-6">
-              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="pr-url" className="text-sm font-medium">
-                    GitHub PR URL
-                  </label>
-                  <input
-                    id="pr-url"
-                    type="url"
-                    placeholder="https://github.com/owner/repo/pull/123"
-                    value={prUrl}
-                    onChange={(e) => setPrUrl(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="instructions" className="text-sm font-medium">
-                    Instructions <span className="text-muted-foreground font-normal">(optional)</span>
-                  </label>
-                  <textarea
-                    id="instructions"
-                    rows={2}
-                    placeholder="e.g. focus on performance, flag any security concerns, explain the auth flow"
-                    value={instructions}
-                    onChange={(e) => setInstructions(e.target.value)}
-                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Provider</label>
-                  <div className="flex gap-2">
-                    {(['claude', 'gemini'] as const).map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => handleProviderChange(p)}
-                        className={`flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                          provider === p
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                        }`}
-                      >
-                        {PROVIDERS[p].label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Model</label>
-                  <div className="flex flex-wrap gap-2">
-                    {PROVIDERS[provider].models.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setModel(m.id)}
-                        className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                          model === m.id
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {provider === 'claude' && (
-                  <ToggleSwitch
-                    id="thinking"
-                    label="Extended thinking"
-                    description={thinking ? 'Deeper reasoning · slower' : 'Standard speed'}
-                    checked={thinking}
-                    onToggle={() => setThinking((t) => !t)}
-                  />
-                )}
-
-                <ToggleSwitch
-                  id="signal-boost"
-                  label="Signal boost"
-                  description="Skip trivial changes, focus on design and complexity"
-                  checked={signalBoost}
-                  onToggle={() => setSignalBoost((s) => !s)}
-                  badge="Experimental"
-                />
-
-                <ToggleSwitch
-                  id="smart-imports"
-                  label="Smart imports"
-                  description="Use AI to find related files across all languages"
-                  checked={smartImports}
-                  onToggle={() => setSmartImports((s) => !s)}
-                  badge="Experimental"
-                />
-
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <Button type="submit" className="w-full">
-                  Generate Review
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* History */}
-        {history.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Recent reviews</p>
+          <div
+            className={`grid gap-6 items-start ${history.length > 0 ? 'grid-cols-[2fr_3fr]' : 'max-w-lg mx-auto w-full'}`}
+          >
+            {/* PR form */}
             <Card>
-              <CardContent className="p-0">
-                <ul className="divide-y">
-                  {history.map((entry) => {
-                    const risk = riskConfig[entry.riskLevel];
-                    return (
-                      <li key={entry.id}>
+              <CardContent className="pt-6">
+                <div className="flex justify-end items-center gap-2 mb-4">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <CircleCheck className="h-3 w-3" />@{(authStatus as { login: string }).login}
+                  </span>
+                  <button
+                    onClick={() => setSettingsOpen(true)}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    aria-label="Settings"
+                  >
+                    <Settings className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  >
+                    <LogOut className="h-3 w-3" />
+                    Sign out
+                  </button>
+                </div>
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="pr-url" className="text-sm font-medium flex items-center gap-1.5">
+                      <GitHubIcon className="h-3.5 w-3.5" />
+                      Pull Request URL
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        id="pr-url"
+                        type="url"
+                        placeholder="https://github.com/owner/repo/pull/123"
+                        value={prUrl}
+                        onChange={(e) => setPrUrl(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        required
+                      />
+                      <Button type="button" variant="outline" onClick={() => setPrPickerOpen(true)} className="gap-1.5">
+                        <Search className="h-3.5 w-3.5" />
+                        Browse
+                      </Button>
+                    </div>
+                  </div>
+                  <PRPickerDialog open={prPickerOpen} onOpenChange={setPrPickerOpen} onSelect={setPrUrl} />
+                  <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="instructions" className="text-sm font-medium flex items-center gap-1.5">
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                      Instructions <span className="text-muted-foreground font-normal">(optional)</span>
+                    </label>
+                    <textarea
+                      id="instructions"
+                      rows={5}
+                      placeholder="e.g. focus on performance, flag any security concerns, explain the auth flow"
+                      value={instructions}
+                      onChange={(e) => setInstructions(e.target.value)}
+                      onBlur={() => savePrefs()}
+                      className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium">Provider</label>
+                    <div className="flex gap-2">
+                      {(['claude', 'gemini'] as const).map((p) => (
                         <button
-                          onClick={() => handleLoadFromHistory(entry.id)}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors group"
+                          key={p}
+                          type="button"
+                          onClick={() => handleProviderChange(p)}
+                          className={`flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                            provider === p
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                          }`}
                         >
-                          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                            <span className="text-sm font-medium truncate">{entry.prTitle}</span>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {entry.author} · {entry.model ? (MODEL_LABELS[entry.model] ?? entry.model) : 'Unknown'} ·{' '}
-                              {timeAgo(entry.savedAt)}
-                            </span>
-                          </div>
-                          <Badge variant="outline" className={`shrink-0 text-xs ${risk.className}`}>
-                            {risk.label}
-                          </Badge>
-                          <button
-                            onClick={(e) => handleDeleteFromHistory(e, entry.id)}
-                            className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity text-xs px-1"
-                            aria-label="Delete"
-                          >
-                            ✕
-                          </button>
+                          {PROVIDERS[p].label}
                         </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium">Model</label>
+                    <div className="flex flex-wrap gap-2">
+                      {PROVIDERS[provider].models.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setModel(m.id)}
+                          className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                            model === m.id
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {provider === 'claude' && (
+                    <ToggleSwitch
+                      id="thinking"
+                      label="Extended thinking"
+                      description={thinking ? 'Deeper reasoning · slower' : 'Standard speed'}
+                      checked={thinking}
+                      onToggle={() => setThinking((t) => !t)}
+                    />
+                  )}
+
+                  <ToggleSwitch
+                    id="signal-boost"
+                    label="Signal boost"
+                    description="Skip trivial changes, focus on design and complexity"
+                    checked={signalBoost}
+                    onToggle={() => setSignalBoost((s) => !s)}
+                    badge="Experimental"
+                  />
+
+                  <ToggleSwitch
+                    id="smart-imports"
+                    label="Smart imports"
+                    description="Use AI to find related files across all languages"
+                    checked={smartImports}
+                    onToggle={() => setSmartImports((s) => !s)}
+                    badge="Experimental"
+                  />
+
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button type="submit" className="w-full gap-2">
+                    <Play className="h-4 w-4" />
+                    Generate Review
+                  </Button>
+                </form>
               </CardContent>
             </Card>
+
+            {/* History */}
+            {history.length > 0 && (
+              <Card className="min-h-0 max-h-[calc(100vh-12rem)] sticky top-8 overflow-hidden flex flex-col bg-card/50">
+                <div className="px-4 pt-4 pb-2">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <History className="h-3 w-3" />
+                    Recent reviews
+                  </p>
+                </div>
+                <CardContent className="p-0 flex-1 overflow-y-auto min-h-0">
+                  <ul className="divide-y">
+                    {history.map((entry) => {
+                      const risk = riskConfig[entry.riskLevel];
+                      return (
+                        <li key={entry.id}>
+                          <button
+                            onClick={() => handleLoadFromHistory(entry.id)}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors group"
+                          >
+                            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                              <span className="text-sm font-medium truncate">{entry.prTitle}</span>
+                              <span className="text-xs text-muted-foreground truncate">
+                                {entry.author} · {entry.model ? (MODEL_LABELS[entry.model] ?? entry.model) : 'Unknown'}
+                                {entry.generationDurationMs != null &&
+                                  ` · ${formatDuration(entry.generationDurationMs)}`}
+                                {' · '}
+                                {timeAgo(entry.savedAt)}
+                              </span>
+                            </div>
+                            <Badge variant="outline" className={`shrink-0 text-xs ${risk.badgeClassName}`}>
+                              {risk.label}
+                            </Badge>
+                            <button
+                              onClick={(e) => handleDeleteFromHistory(e, entry.id)}
+                              className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity px-1"
+                              aria-label="Delete"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </div>
