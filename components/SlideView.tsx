@@ -4,7 +4,7 @@ import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'reac
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DiffHunkGroup } from '@/components/DiffHunk';
-import { InlineCode } from '@/components/InlineCode';
+import { Markdown } from '@/components/Markdown';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
 import type { Slide, SlideType, DiffHunk } from '@/lib/types';
 
@@ -23,13 +23,6 @@ const slideTypeConfig: Record<SlideType, { label: string; className: string }> =
   config:     { label: 'Config',     className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
   docs:       { label: 'Docs',       className: 'bg-zinc-700 text-zinc-200 border-zinc-600' },
 };
-
-// Split "1) foo 2) bar 3) baz" into ["foo", "bar", "baz"]
-function splitReviewFocus(text: string): string[] {
-  const parts = text.split(/\s*\d+\)\s+/);
-  // First element is empty string if text starts with "1) "
-  return parts.filter(Boolean);
-}
 
 // Group hunks by filePath so we can render them under a single file header
 function groupHunksByFile(hunks: DiffHunk[]): { filePath: string; hunks: DiffHunk[] }[] {
@@ -61,7 +54,7 @@ export function SlideView({ slide }: Props) {
 
         <h2 className="text-lg font-semibold leading-tight">{slide.title}</h2>
 
-        <p className="text-sm text-muted-foreground leading-relaxed"><InlineCode text={slide.narrative} /></p>
+        <Markdown className="text-sm text-muted-foreground leading-relaxed">{slide.narrative}</Markdown>
 
         {/* Review focus */}
         <Card className="border">
@@ -71,14 +64,7 @@ export function SlideView({ slide }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-3 px-4">
-            <ul className="space-y-1.5">
-              {splitReviewFocus(slide.reviewFocus).map((point, i) => (
-                <li key={i} className="flex gap-2 text-sm">
-                  <span className="text-muted-foreground shrink-0 mt-px">•</span>
-                  <span><InlineCode text={point} /></span>
-                </li>
-              ))}
-            </ul>
+            <Markdown className="text-sm">{slide.reviewFocus}</Markdown>
           </CardContent>
         </Card>
 
@@ -109,9 +95,7 @@ export function SlideView({ slide }: Props) {
               {slide.contextSnippets.map((snippet, i) => (
                 <Card key={i} className="bg-muted/30">
                   <CardContent className="p-3">
-                    <pre className="text-xs whitespace-pre-wrap break-all text-muted-foreground font-mono">
-                      {snippet}
-                    </pre>
+                    <Markdown className="text-xs text-muted-foreground">{snippet}</Markdown>
                   </CardContent>
                 </Card>
               ))}

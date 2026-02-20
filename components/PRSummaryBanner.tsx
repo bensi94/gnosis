@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { InlineCode } from '@/components/InlineCode';
+import { Markdown } from '@/components/Markdown';
 import type { ReviewGuide } from '@/lib/types';
 
 interface Props {
@@ -46,12 +46,12 @@ export function PRSummaryBanner({ review }: Props) {
             </a>
           </div>
 
-          <p className="text-sm text-muted-foreground"><InlineCode text={review.summary} /></p>
+          <Markdown className="text-sm text-muted-foreground">{review.summary}</Markdown>
 
-          <p className="text-xs text-muted-foreground italic">
-            <span className="font-medium not-italic text-foreground">Risk rationale:</span>{' '}
-            <InlineCode text={review.riskRationale} />
-          </p>
+          <div className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Risk rationale:</span>{' '}
+            <Markdown className="inline-block text-xs text-muted-foreground [&_p]:inline">{review.riskRationale}</Markdown>
+          </div>
         </div>
       </CardContent>
     </Card>
