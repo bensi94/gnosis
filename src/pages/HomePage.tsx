@@ -5,9 +5,11 @@ import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { LoadingScreen } from '../../components/LoadingScreen';
 import type { ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
+import { timeAgo } from '../../lib/utils';
 
 interface Props {
   onReviewReady: (review: ReviewGuide) => void;
+  prefillPrUrl?: string;
 }
 
 type AuthStatus = 'checking' | 'unauthenticated' | 'signing-in' | { login: string };
@@ -18,21 +20,9 @@ const riskConfig = {
   high:   { label: 'High',   className: 'bg-red-900 text-red-200 border-red-700' },
 };
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  const hours = Math.floor(diff / 3_600_000);
-  const days = Math.floor(diff / 86_400_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
-export function HomePage({ onReviewReady }: Props) {
+export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
-  const [prUrl, setPrUrl] = useState('');
+  const [prUrl, setPrUrl] = useState(prefillPrUrl ?? '');
   const [model, setModel] = useState<'opus' | 'sonnet'>('opus');
   const [thinking, setThinking] = useState(false);
   const [signalBoost, setSignalBoost] = useState(false);

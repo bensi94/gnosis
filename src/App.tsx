@@ -9,8 +9,10 @@ type Page = 'home' | 'review';
 export function App() {
   const [page, setPage] = useState<Page>('home');
   const [review, setReview] = useState<ReviewGuide | null>(null);
+  const [prefillPrUrl, setPrefillPrUrl] = useState<string | undefined>();
 
   function handleReviewReady(r: ReviewGuide) {
+    setPrefillPrUrl(undefined);
     setReview(r);
     setPage('review');
   }
@@ -20,10 +22,16 @@ export function App() {
     setPage('home');
   }
 
+  function handleReReview(prUrl: string) {
+    setPrefillPrUrl(prUrl);
+    setReview(null);
+    setPage('home');
+  }
+
   return (
     <TooltipProvider>
-      {page === 'home' && <HomePage onReviewReady={handleReviewReady} />}
-      {page === 'review' && review && <ReviewPage review={review} onBack={handleBack} />}
+      {page === 'home' && <HomePage onReviewReady={handleReviewReady} prefillPrUrl={prefillPrUrl} />}
+      {page === 'review' && review && <ReviewPage review={review} onBack={handleBack} onReReview={handleReReview} />}
     </TooltipProvider>
   );
 }

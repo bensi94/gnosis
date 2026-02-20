@@ -1,17 +1,37 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { PRSummaryBanner } from '../../components/PRSummaryBanner';
+import { StaleBanner } from '../../components/StaleBanner';
 import { OverviewSlide } from '../../components/OverviewSlide';
 import { SlideView } from '../../components/SlideView';
 import { SlideNav } from '../../components/SlideNav';
-import type { ReviewGuide } from '../../lib/types';
+import { SubmitReviewDialog } from '../../components/SubmitReviewDialog';
+import { useReviewComments } from '../../lib/use-review-comments';
+import type { ReviewGuide, ReviewEvent, FreshnessResult } from '../../lib/types';
 
 interface Props {
   review: ReviewGuide;
   onBack: () => void;
+  onReReview: (prUrl: string) => void;
 }
 
-export function ReviewPage({ review, onBack }: Props) {
+export function ReviewPage({ review, onBack, onReReview }: Props) {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+  const [currentLogin, setCurrentLogin] = useState<string | null>(null);
+  const [freshness, setFreshness] = useState<FreshnessResult | null>(null);
+  const { comments, addComment, removeComment, editComment, clearAll } = useReviewComments();
+
+  useEffect(() => {
+    window.electronAPI.getAuthState().then((state) => setCurrentLogin(state.login));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    window.electronAPI.checkPrFreshness(review.prUrl, review.headSha).then((result) => {
+      if (!cancelled) setFreshness(result);
+    });
+    return () => { cancelled = true; };
+  }, [review.prUrl, review.headSha]);
 
   const handlePrev = useCallback(() => {
     setCurrentSlide((n) => Math.max(0, n - 1));
@@ -23,12 +43,38 @@ export function ReviewPage({ review, onBack }: Props) {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Don't navigate when typing in a textarea or input
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+
       if (e.key === 'ArrowLeft') handlePrev();
       if (e.key === 'ArrowRight') handleNext();
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePrev, handleNext]);
+
+  const commentCallbacks = useMemo(
+    () => ({ onAddComment: addComment, onRemoveComment: removeComment, onEditComment: editComment }),
+    [addComment, removeComment, editComment],
+  );
+
+  async function handleSubmitReview(event: ReviewEvent, body: string) {
+    const result = await window.electronAPI.submitReview({
+      prUrl: review.prUrl,
+      headSha: review.headSha!,
+      event,
+      body,
+      comments: comments.map((c) => ({
+        path: c.filePath,
+        line: c.line,
+        side: c.side,
+        body: c.body,
+      })),
+    });
+    clearAll();
+    return result;
+  }
 
   if (review.slides.length === 0) {
     return (
@@ -50,6 +96,10 @@ export function ReviewPage({ review, onBack }: Props) {
     <div className="flex flex-col h-screen overflow-hidden">
       <PRSummaryBanner review={review} />
 
+      {freshness && (
+        <StaleBanner freshness={freshness} onReReview={() => onReReview(review.prUrl)} />
+      )}
+
       {currentSlide === 0 ? (
         <OverviewSlide review={review} onNavigate={(n) => setCurrentSlide(n)} />
       ) : (
@@ -57,6 +107,8 @@ export function ReviewPage({ review, onBack }: Props) {
           slide={review.slides[currentSlide - 1]}
           slideNumber={currentSlide}
           totalSlides={review.slides.length}
+          pendingComments={comments}
+          commentCallbacks={commentCallbacks}
         />
       )}
 
@@ -65,6 +117,18 @@ export function ReviewPage({ review, onBack }: Props) {
         total={review.slides.length}
         onPrev={handlePrev}
         onNext={handleNext}
+        commentCount={comments.length}
+        onSubmitReview={() => setShowSubmitDialog(true)}
+      />
+
+      <SubmitReviewDialog
+        open={showSubmitDialog}
+        onOpenChange={setShowSubmitDialog}
+        comments={comments}
+        prUrl={review.prUrl}
+        headSha={review.headSha}
+        isOwnPr={currentLogin !== null && currentLogin === review.author}
+        onSubmit={handleSubmitReview}
       />
 
       <div className="absolute top-4 left-4">

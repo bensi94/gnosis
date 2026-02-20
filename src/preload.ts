@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { GenerateReviewRequest, ReviewGuide, ReviewHistoryEntry } from '../lib/types';
+import type { GenerateReviewRequest, ReviewGuide, ReviewHistoryEntry, SubmitReviewRequest, FreshnessResult } from '../lib/types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   generateReview: (req: GenerateReviewRequest): Promise<ReviewGuide> =>
@@ -24,4 +24,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   offReviewProgress: (): void => {
     ipcRenderer.removeAllListeners('review-progress');
   },
+  submitReview: (req: SubmitReviewRequest): Promise<{ reviewUrl: string; droppedCommentCount: number }> =>
+    ipcRenderer.invoke('submit-review', req),
+  checkPrFreshness: (prUrl: string, headSha: string | undefined): Promise<FreshnessResult> =>
+    ipcRenderer.invoke('check-pr-freshness', prUrl, headSha),
 });

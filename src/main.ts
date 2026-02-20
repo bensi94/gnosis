@@ -15,7 +15,8 @@ import {
 import { buildContextPackage } from '../lib/context-builder';
 import { generateReviewGuide } from '../lib/agent';
 import { renderDiffHunk, inferLanguage } from '../lib/highlight';
-import type { GenerateReviewRequest, ReviewGuide, ReviewHistoryEntry } from '../lib/types';
+import { parsePatchValidLines } from '../lib/diff-lines';
+import type { GenerateReviewRequest, ReviewGuide, ReviewHistoryEntry, SubmitReviewRequest, FreshnessResult } from '../lib/types';
 
 // Injected by Electron Forge Vite plugin
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
@@ -336,6 +337,56 @@ ipcMain.handle('delete-review', async (_event, id: string) => {
   fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
 });
 
+ipcMain.handle('check-pr-freshness', async (_event, prUrl: string, headSha: string | undefined): Promise<FreshnessResult> => {
+  if (!headSha) {
+    return { status: 'unknown', reason: 'Review has no stored head SHA' };
+  }
+
+  const token = getResolvedToken();
+  const octokit = new Octokit({ auth: token ?? undefined });
+  const { owner, repo, pullNumber } = parsePrUrl(prUrl);
+
+  try {
+    const prData = await getPrMetadata(octokit, owner, repo, pullNumber);
+    const currentSha = prData.headSha;
+
+    if (currentSha === headSha) {
+      return { status: 'current' };
+    }
+
+    try {
+      const { data } = await octokit.repos.compareCommits({
+        owner,
+        repo,
+        base: headSha,
+        head: currentSha,
+      });
+
+      const commits = (data.commits ?? []).slice(0, 50).map((c) => ({
+        sha: c.sha,
+        message: (c.commit.message ?? '').split('\n')[0],
+        authorLogin: c.author?.login ?? c.commit.author?.name ?? 'unknown',
+        authorDate: c.commit.author?.date ?? '',
+      }));
+
+      return {
+        status: 'stale',
+        aheadBy: data.ahead_by ?? commits.length,
+        commits,
+      };
+    } catch (compareErr: unknown) {
+      const status = (compareErr as { status?: number })?.status;
+      if (status === 404) {
+        return { status: 'force-pushed' };
+      }
+      throw compareErr;
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return { status: 'unknown', reason: message };
+  }
+});
+
 ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, thinking, signalBoost }: GenerateReviewRequest) => {
   const token = getResolvedToken();
   const octokit = new Octokit({ auth: token ?? undefined });
@@ -406,6 +457,7 @@ ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, t
   reviewGuide.prDescription = reviewGuide.prDescription || prData.description;
   reviewGuide.author = reviewGuide.author || prData.author;
   reviewGuide.prUrl = prUrl;
+  reviewGuide.headSha = prData.headSha;
   reviewGuide.totalFilesChanged = changedFiles.length;
   reviewGuide.totalLinesChanged = changedFiles.reduce(
     (sum, f) => sum + f.additions + f.deletions,
@@ -428,4 +480,69 @@ ipcMain.handle('generate-review', async (_event, { prUrl, model, instructions, t
 
   saveReviewToHistory(reviewGuide);
   return reviewGuide;
+});
+
+ipcMain.handle('submit-review', async (_event, req: SubmitReviewRequest) => {
+  const token = getResolvedToken();
+  const octokit = new Octokit({ auth: token ?? undefined });
+  const { owner, repo, pullNumber } = parsePrUrl(req.prUrl);
+
+  // Fetch actual PR file patches to validate line numbers.
+  // The AI-generated hunks have expanded context (10 lines vs GitHub's 3),
+  // so some lines may not be in the real diff.
+  const prFiles = await octokit.paginate(octokit.pulls.listFiles, {
+    owner,
+    repo,
+    pull_number: pullNumber,
+    per_page: 100,
+  });
+
+  const validLinesByFile = new Map<string, Set<string>>();
+  for (const file of prFiles) {
+    if (file.patch) {
+      validLinesByFile.set(file.filename, parsePatchValidLines(file.patch));
+    }
+  }
+
+  // Partition comments into valid (can be posted as line comments) and
+  // dropped (line not in GitHub's diff — folded into review body instead)
+  const validComments: typeof req.comments = [];
+  const droppedComments: typeof req.comments = [];
+
+  for (const c of req.comments) {
+    const validLines = validLinesByFile.get(c.path);
+    const key = `${c.line}:${c.side}`;
+    if (validLines?.has(key)) {
+      validComments.push(c);
+    } else {
+      droppedComments.push(c);
+    }
+  }
+
+  // If some comments can't be posted inline, append them to the review body
+  let reviewBody = req.body;
+  if (droppedComments.length > 0) {
+    const droppedText = droppedComments
+      .map((c) => `**${c.path}:${c.line}** — ${c.body}`)
+      .join('\n\n');
+    const suffix = `\n\n---\n_${droppedComments.length} comment(s) could not be posted inline (lines outside the diff range):_\n\n${droppedText}`;
+    reviewBody = (reviewBody || '') + suffix;
+  }
+
+  const { data } = await octokit.pulls.createReview({
+    owner,
+    repo,
+    pull_number: pullNumber,
+    commit_id: req.headSha,
+    body: reviewBody,
+    event: req.event,
+    comments: validComments.map((c) => ({
+      path: c.path,
+      line: c.line,
+      side: c.side,
+      body: c.body,
+    })),
+  });
+
+  return { reviewUrl: data.html_url, droppedCommentCount: droppedComments.length };
 });
