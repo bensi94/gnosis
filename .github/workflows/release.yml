@@ -19,6 +19,7 @@ jobs:
         os:
           - macos-latest # arm64 (Apple Silicon)
           - windows-latest # x64
+          - ubuntu-latest # x64
 
     steps:
       - uses: actions/checkout@v4
