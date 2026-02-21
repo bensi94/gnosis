@@ -3,6 +3,7 @@
   "productName": "Gnosis",
   "version": "0.1.2",
   "description": "AI-guided code review. Understand the story before you read the diff.",
+  "license": "MIT",
   "private": true,
   "main": ".vite/build/main.js",
   "scripts": {

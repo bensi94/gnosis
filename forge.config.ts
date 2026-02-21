@@ -18,7 +18,7 @@ const config: ForgeConfig = {
     new MakerSquirrel({ authors: 'Oddur Magnusson' }),
     new MakerZIP({}, ['darwin']),
     new MakerDeb({}),
-    new MakerRpm({}),
+    new MakerRpm({ options: { license: 'MIT' } }),
   ],
   publishers: [
     new PublisherGithub({
