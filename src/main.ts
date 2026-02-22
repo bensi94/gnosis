@@ -21,7 +21,7 @@ import { buildContextPackage } from '../lib/context-builder';
 import { generateReviewGuide } from '../lib/agent';
 import { checkForUpdate } from '../lib/updater';
 import { renderDiffHunk, reRenderAllHunks } from '../lib/highlight';
-import { parsePatchValidLines } from '../lib/diff-lines';
+import { parseDiffLines, parsePatchValidLines } from '../lib/diff-lines';
 import { setBinaryOverride, detectBinaryPath, resolveBinaryPath } from '../lib/providers/shared';
 import { getProvider } from '../lib/provider';
 import { buildSlideChatSystemPrompt, buildSlideChatUserMessage } from '../lib/chat-agent';
@@ -765,8 +765,38 @@ ipcMain.handle(
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AI response may omit fields
         dependsOn: aiSlide.dependsOn ?? [],
         mermaidDiagram: aiSlide.mermaidDiagram,
+        reviewChecks: aiSlide.reviewChecks,
       };
     });
+
+    // Sanitize reviewChecks — clear invalid file/line refs so they render as non-clickable
+    for (const slide of resolvedSlides) {
+      if (!Array.isArray(slide.reviewChecks)) continue;
+      const slideFilePaths = new Set(slide.diffHunks.map((h) => h.filePath));
+
+      for (const check of slide.reviewChecks) {
+        if (!check.filePath || !slideFilePaths.has(check.filePath)) {
+          delete check.filePath;
+          delete check.startLine;
+          continue;
+        }
+        if (check.startLine == null || check.startLine <= 0) {
+          delete check.filePath;
+          delete check.startLine;
+          continue;
+        }
+        // Verify startLine falls within one of the file's hunk ranges
+        const fileHunks = slide.diffHunks.filter((h) => h.filePath === check.filePath);
+        const lineExists = fileHunks.some((hunk) => {
+          const lines = parseDiffLines(hunk.hunkHeader, hunk.content);
+          return lines.some((l) => l.lineNumber === check.startLine);
+        });
+        if (!lineExists) {
+          delete check.filePath;
+          delete check.startLine;
+        }
+      }
+    }
 
     // Catch-all slide for unassigned hunks
     const unassigned = indexedHunks.filter((h) => !assignedIds.has(h.id));

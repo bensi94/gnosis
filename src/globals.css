@@ -269,6 +269,24 @@
   opacity: 1 !important;
 }
 
+/* ─── Check suggestion jump highlight ────────────────────────── */
+
+.check-highlight {
+  position: relative;
+}
+.check-highlight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: oklch(0.65 0.15 195 / 30%);
+  animation: check-highlight-fade 1.5s ease-out forwards;
+}
+@keyframes check-highlight-fade {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
 /* ─── Freshness banner ────────────────────────────────────────── */
 
 .staleBanner-current {
@@ -388,17 +406,20 @@
 
 /* ─── Review focus callout ────────────────────────────────────── */
 
-.review-focus-content ul {
+.review-focus-content ul,
+ul.review-focus-content {
   list-style: none;
   padding-left: 0;
 }
 
-.review-focus-content ul > li {
+.review-focus-content ul > li,
+ul.review-focus-content > li {
   position: relative;
   padding-left: 1.5rem;
 }
 
-.review-focus-content ul > li::before {
+.review-focus-content ul > li::before,
+ul.review-focus-content > li::before {
   content: '▸';
   position: absolute;
   left: 0;

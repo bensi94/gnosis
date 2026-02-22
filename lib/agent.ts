@@ -32,6 +32,12 @@ REVIEW FOCUS: Write 2–4 actionable checks as a markdown bullet list.
 - Each bullet should be a single clear sentence
 - Focus on what could actually go wrong, not just what to look at
 
+REVIEW CHECKS (structured): Also produce a reviewChecks array with the same items as reviewFocus but in structured form.
+- Each entry has "text" (the check sentence), plus optional "filePath" and "startLine" to pinpoint where the reviewer should look.
+- filePath must exactly match one of the diffHunks[].filePath values on the same slide.
+- startLine is the new-file line number (right side) within one of that file's hunk ranges.
+- If a check is general and doesn't reference a specific line, set filePath and startLine to null.
+
 MERMAID DIAGRAM (optional): Include a Mermaid diagram when it genuinely helps the reviewer understand the flow or structure. Omit it (null) when the change is simple or the diagram would add clutter.
 - Use sequenceDiagram for request/response flows, async calls, event handling, or service interactions
 - Use flowchart TD for conditional logic, branching, or state transitions
@@ -97,7 +103,14 @@ The JSON must match this schema exactly:
       "contextSnippets": string[],
       "affectedFiles": string[],
       "dependsOn": string[],
-      "mermaidDiagram": string | null
+      "mermaidDiagram": string | null,
+      "reviewChecks": [
+        {
+          "text": string,
+          "filePath": string | null,
+          "startLine": number | null
+        }
+      ]
     }
   ]
 }`;
@@ -223,6 +236,7 @@ export async function generateReviewGuide(
     }
 
     parsed.prUrl = prUrl;
+
     return parsed;
   }
 
