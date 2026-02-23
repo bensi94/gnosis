@@ -30,6 +30,8 @@ declare global {
       sendSlideChat: (req: SendSlideChatRequest) => Promise<string>;
       onChatProgress: (callback: (chunk: string) => void) => void;
       offChatProgress: () => void;
+      onChatToolUse: (callback: (toolName: string) => void) => void;
+      offChatToolUse: () => void;
       submitReview: (req: SubmitReviewRequest) => Promise<{ reviewUrl: string; droppedCommentCount: number }>;
       checkPrFreshness: (prUrl: string, headSha: string | undefined) => Promise<FreshnessResult>;
       loadPreferences: () => Promise<Preferences>;

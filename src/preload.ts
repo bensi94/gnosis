@@ -43,6 +43,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   offChatProgress: (): void => {
     ipcRenderer.removeAllListeners('chat-progress');
   },
+  onChatToolUse: (callback: (toolName: string) => void): void => {
+    ipcRenderer.on('chat-tool-use', (_event, { toolName }: { toolName: string }) => callback(toolName));
+  },
+  offChatToolUse: (): void => {
+    ipcRenderer.removeAllListeners('chat-tool-use');
+  },
   submitReview: (req: SubmitReviewRequest): Promise<{ reviewUrl: string; droppedCommentCount: number }> =>
     ipcRenderer.invoke('submit-review', req),
   checkPrFreshness: (prUrl: string, headSha: string | undefined): Promise<FreshnessResult> =>
