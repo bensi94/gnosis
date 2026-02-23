@@ -18,7 +18,8 @@ export function buildContextPackage(
   fileContents: Record<string, string>,
   headFileContents: Record<string, string>,
   neighborFiles: Record<string, string>,
-  hunkIndex: string
+  hunkIndex: string,
+  excludedFilesSummary?: string
 ): string {
   const totalAdditions = changedFiles.reduce((s, f) => s + f.additions, 0);
   const totalDeletions = changedFiles.reduce((s, f) => s + f.deletions, 0);
@@ -63,9 +64,12 @@ ${expandedDiff}
   let headContentsStr = headContentsSection;
   let neighborStr = neighborSection;
 
+  const excludedStr = excludedFilesSummary ?? '';
+
   function totalSize(): number {
     return (
       metaSection.length +
+      excludedStr.length +
       4 +
       diffStr.length +
       4 +
@@ -154,6 +158,7 @@ ${expandedDiff}
 
   const finalPackage =
     metaSection +
+    (excludedStr ? '\n\n' + excludedStr : '') +
     '\n\n' +
     diffStr +
     '\n\n' +

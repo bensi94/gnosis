@@ -24,6 +24,7 @@ interface Props {
   onDiffLayoutChange: (layout: Preferences['diffLayout']) => void;
   onAskQuestion?: () => void;
   gitFileUrlBase?: string | null;
+  excludedFiles?: Set<string>;
 }
 
 // Group hunks by filePath so we can render them under a single file header
@@ -78,6 +79,7 @@ export function SlideView({
   onDiffLayoutChange,
   onAskQuestion,
   gitFileUrlBase,
+  excludedFiles,
 }: Props) {
   const typeConfig = slideTypeConfig[slide.slideType];
   const Icon = typeConfig.icon;
@@ -149,7 +151,11 @@ export function SlideView({
               <ul className="space-y-1">
                 {slide.affectedFiles.map((f) => (
                   <li key={f} className="font-mono text-xs text-muted-foreground truncate">
-                    <FilePathLink filePath={f} gitFileUrlBase={gitFileUrlBase} />
+                    {excludedFiles?.has(f) ? (
+                      <span className="italic">{f} (excluded)</span>
+                    ) : (
+                      <FilePathLink filePath={f} gitFileUrlBase={gitFileUrlBase} />
+                    )}
                   </li>
                 ))}
               </ul>

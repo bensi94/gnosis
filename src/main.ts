@@ -26,6 +26,7 @@ import { setBinaryOverride, detectBinaryPath, resolveBinaryPath } from '../lib/p
 import { getProvider } from '../lib/provider';
 import { buildSlideChatSystemPrompt, buildSlideChatUserMessage } from '../lib/chat-agent';
 import { buildIndexedHunks, expandFullDiff, formatHunkIndexForPrompt, sortDiffHunks } from '../lib/diff-parse';
+import { classifyFiles, filterDiff, buildExcludedFilesSummary } from '../lib/file-filter';
 import { writeMcpConfig, cleanupMcpConfig } from '../lib/mcp-config';
 import type {
   DiffHunk,
@@ -636,14 +637,27 @@ ipcMain.handle(
       throw new Error('PR has no changed files');
     }
 
+    // Filter out generated/lock files early to avoid token budget blowup
+    const { normalFiles, generatedFiles } = classifyFiles(changedFiles);
+    const generatedFilenames = new Set(generatedFiles.map((f) => f.filename));
+    const filteredDiff = filterDiff(diff, generatedFilenames);
+    const excludedFilesSummary = buildExcludedFilesSummary(generatedFiles);
+
+    if (generatedFiles.length > 0) {
+      console.log(
+        `[main] Filtered ${generatedFiles.length} generated file(s):`,
+        generatedFiles.map((f) => f.filename)
+      );
+    }
+
     const baseRef = prData.baseBranch;
     const headRef = prData.headSha;
 
     const fileContents: Record<string, string> = {};
     const headFileContents: Record<string, string> = {};
     const concurrency = 5;
-    const filesToFetch = changedFiles.filter((f) => f.status !== 'deleted');
-    const filesToFetchBase = changedFiles.filter((f) => f.status !== 'added');
+    const filesToFetch = normalFiles.filter((f) => f.status !== 'deleted');
+    const filesToFetchBase = normalFiles.filter((f) => f.status !== 'added');
 
     for (let i = 0; i < Math.max(filesToFetch.length, filesToFetchBase.length); i += concurrency) {
       const headBatch = filesToFetch.slice(i, i + concurrency);
@@ -665,15 +679,15 @@ ipcMain.handle(
       octokit,
       owner,
       repo,
-      changedFiles.map((f) => f.filename),
+      normalFiles.map((f) => f.filename),
       allFileContents,
       baseRef,
       smartImports ? provider : undefined
     );
 
-    // Parse diff into indexed hunks and build expanded diff
-    const indexedHunks = buildIndexedHunks(diff, fileContents, headFileContents);
-    const expandedDiff = expandFullDiff(diff, fileContents, headFileContents);
+    // Parse diff into indexed hunks and build expanded diff (using filtered diff)
+    const indexedHunks = buildIndexedHunks(filteredDiff, fileContents, headFileContents);
+    const expandedDiff = expandFullDiff(filteredDiff, fileContents, headFileContents);
     const hunkIndex = formatHunkIndexForPrompt(indexedHunks);
 
     const contextPackage = buildContextPackage(
@@ -683,7 +697,8 @@ ipcMain.handle(
       fileContents,
       headFileContents,
       neighborFiles,
-      hunkIndex
+      hunkIndex,
+      excludedFilesSummary
     );
 
     console.log('[main] Generating review guide...');
@@ -835,6 +850,7 @@ ipcMain.handle(
       totalFilesChanged: changedFiles.length,
       totalLinesChanged: changedFiles.reduce((sum, f) => sum + f.additions + f.deletions, 0),
       neighborFileCount: Object.keys(neighborFiles).length,
+      excludedFiles: generatedFiles.length > 0 ? generatedFiles.map((f) => f.filename) : undefined,
       generationDurationMs,
       slides: resolvedSlides,
       headSha: prData.headSha,

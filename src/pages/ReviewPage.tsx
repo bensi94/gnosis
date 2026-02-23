@@ -43,6 +43,7 @@ export function ReviewPage({ review: initialReview, onBack, onReReview }: Props)
   const { comments, addComment, removeComment, editComment, clearAll } = useReviewComments();
   const slideChat = useSlideChat(review, chatProvider, chatModel);
   const gitFileUrlBase = useMemo(() => buildFileUrlBase(review.prUrl, review.headSha), [review.prUrl, review.headSha]);
+  const excludedFilesSet = useMemo(() => new Set(review.excludedFiles ?? []), [review.excludedFiles]);
 
   useEffect(() => {
     void window.electronAPI.loadPreferences().then((p) => {
@@ -168,6 +169,7 @@ export function ReviewPage({ review: initialReview, onBack, onReReview }: Props)
               onDiffLayoutChange={handleDiffLayoutChange}
               onAskQuestion={() => setChatOpen(true)}
               gitFileUrlBase={gitFileUrlBase}
+              excludedFiles={excludedFilesSet}
             />
           )}
         </div>
