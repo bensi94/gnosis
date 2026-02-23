@@ -257,6 +257,10 @@
   background: oklch(0.2 0 0 / 30%);
 }
 
+.split-diff-separator {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
 .split-diff-grid > span.split-diff-line-num:hover {
   color: rgba(255, 255, 255, 0.7) !important;
 }

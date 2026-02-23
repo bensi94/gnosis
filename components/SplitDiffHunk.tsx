@@ -18,6 +18,67 @@ interface SplitDiffHunkGroupProps {
   commentCallbacks?: CommentCallbacks;
 }
 
+function SplitDiffCell({
+  info,
+  html,
+  cellClass,
+  isInteractive,
+  onClickLine,
+}: {
+  info: DiffLineInfo | null;
+  html: string | null;
+  cellClass: string;
+  isInteractive: boolean;
+  onClickLine: (info: DiffLineInfo) => void;
+}) {
+  const lineNum =
+    info?.type === 'context' ? info.lineNumber : info?.type === 'remove' ? info.baseLineNumber : info?.headLineNumber;
+
+  return (
+    <>
+      {isInteractive && (
+        <span
+          className={`split-diff-comment-icon ${cellClass}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: info ? 'pointer' : 'default',
+          }}
+          onClick={() => info && onClickLine(info)}
+        >
+          {info && (
+            <MessageSquarePlus
+              style={{ width: '0.75rem', height: '0.75rem', color: '#58a6ff', opacity: 0 }}
+              className="split-icon-hover"
+            />
+          )}
+        </span>
+      )}
+      <span
+        className={`split-diff-line-num ${cellClass}`}
+        style={{
+          textAlign: 'right',
+          paddingRight: '0.5ch',
+          color: 'rgba(255,255,255,0.3)',
+          userSelect: 'none',
+          fontSize: '0.75rem',
+          cursor: isInteractive && info ? 'pointer' : 'default',
+        }}
+        onClick={() => isInteractive && info && onClickLine(info)}
+      >
+        {lineNum ?? ''}
+      </span>
+      <span
+        className={`split-diff-code ${cellClass}`}
+        style={{ paddingLeft: '0.5ch', paddingRight: '1ch', whiteSpace: 'pre' }}
+      >
+        {html ? <span dangerouslySetInnerHTML={{ __html: html }} /> : null}
+      </span>
+    </>
+  );
+}
+
 function SplitHunk({
   hunk,
   filePath,
@@ -42,7 +103,6 @@ function SplitHunk({
     return buildSplitRows(lineInfos, lineHtmls);
   }, [lineInfos, lineHtmls]);
 
-  // Fall back to static rendering if we can't parse
   if (!splitRows) {
     return <div dangerouslySetInnerHTML={{ __html: hunk.renderedHtml }} />;
   }
@@ -66,8 +126,8 @@ function SplitHunk({
     setActiveFormKey(null);
   }
 
-  // Build grid template columns based on interactive mode
   const gridTemplateColumns = isInteractive ? '1.25rem 3.5ch 1fr 1px 1.25rem 3.5ch 1fr' : '3.5ch 1fr 1px 3.5ch 1fr';
+  const gridColumnCount = isInteractive ? 7 : 5;
 
   return (
     <div
@@ -84,170 +144,122 @@ function SplitHunk({
         className="split-diff-grid"
         style={{ display: 'grid', gridTemplateColumns, minWidth: '100%', width: 'max-content' }}
       >
-        {splitRows.map((row, rowIdx) => (
-          <SplitDiffRow
-            key={rowIdx}
-            row={row}
-            filePath={filePath}
-            pendingComments={pendingComments}
-            activeFormKey={activeFormKey}
-            isInteractive={isInteractive}
-            onClickLine={handleAddComment}
-            onSubmitComment={handleSubmitComment}
-            onCancelForm={() => setActiveFormKey(null)}
-            commentCallbacks={commentCallbacks}
-            gridColumnCount={isInteractive ? 7 : 5}
-          />
-        ))}
+        {splitRows.map((row, rowIdx) => {
+          const leftInfo = row.left?.info ?? null;
+          const rightInfo = row.right?.info ?? null;
+
+          const leftCellClass =
+            leftInfo?.type === 'remove' ? 'split-diff-cell-remove' : !row.left ? 'split-diff-cell-empty' : '';
+          const rightCellClass =
+            rightInfo?.type === 'add' ? 'split-diff-cell-add' : !row.right ? 'split-diff-cell-empty' : '';
+
+          const leftFormKey = leftInfo ? `${leftInfo.lineNumber}:${leftInfo.side}` : null;
+          const rightFormKey = rightInfo ? `${rightInfo.lineNumber}:${rightInfo.side}` : null;
+          const showLeftForm = isInteractive && activeFormKey === leftFormKey;
+          const showRightForm = isInteractive && activeFormKey === rightFormKey;
+
+          const leftComments =
+            isInteractive && leftInfo
+              ? pendingComments.filter(
+                  (c) => c.line === leftInfo.lineNumber && c.side === leftInfo.side && c.filePath === filePath
+                )
+              : [];
+          const rightComments =
+            isInteractive && rightInfo
+              ? pendingComments.filter(
+                  (c) => c.line === rightInfo.lineNumber && c.side === rightInfo.side && c.filePath === filePath
+                )
+              : [];
+
+          const fullSpan = { gridColumn: `1 / ${gridColumnCount + 1}` };
+
+          return (
+            <SplitDiffRowFragment
+              key={rowIdx}
+              row={row}
+              leftCellClass={leftCellClass}
+              rightCellClass={rightCellClass}
+              isInteractive={isInteractive}
+              onClickLine={handleAddComment}
+              showLeftForm={showLeftForm}
+              showRightForm={showRightForm}
+              leftInfo={leftInfo}
+              rightInfo={rightInfo}
+              leftComments={leftComments}
+              rightComments={rightComments}
+              fullSpan={fullSpan}
+              onSubmitComment={handleSubmitComment}
+              onCancelForm={() => setActiveFormKey(null)}
+              commentCallbacks={commentCallbacks}
+            />
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function SplitDiffRow({
+function SplitDiffRowFragment({
   row,
-  filePath,
-  pendingComments,
-  activeFormKey,
+  leftCellClass,
+  rightCellClass,
   isInteractive,
   onClickLine,
+  showLeftForm,
+  showRightForm,
+  leftInfo,
+  rightInfo,
+  leftComments,
+  rightComments,
+  fullSpan,
   onSubmitComment,
   onCancelForm,
   commentCallbacks,
-  gridColumnCount,
 }: {
   row: SplitRow;
-  filePath: string;
-  pendingComments: PendingReviewComment[];
-  activeFormKey: string | null;
+  leftCellClass: string;
+  rightCellClass: string;
   isInteractive: boolean;
   onClickLine: (info: DiffLineInfo) => void;
+  showLeftForm: boolean | string | null;
+  showRightForm: boolean | string | null;
+  leftInfo: DiffLineInfo | null;
+  rightInfo: DiffLineInfo | null;
+  leftComments: PendingReviewComment[];
+  rightComments: PendingReviewComment[];
+  fullSpan: React.CSSProperties;
   onSubmitComment: (body: string, info: DiffLineInfo) => void;
   onCancelForm: () => void;
   commentCallbacks?: CommentCallbacks;
-  gridColumnCount: number;
 }) {
-  const leftInfo = row.left?.info ?? null;
-  const rightInfo = row.right?.info ?? null;
-
-  const leftLineNum = leftInfo?.baseLineNumber ?? leftInfo?.lineNumber ?? null;
-  const rightLineNum = rightInfo?.headLineNumber ?? rightInfo?.lineNumber ?? null;
-
-  const leftCellClass =
-    leftInfo?.type === 'remove' ? 'split-diff-cell-remove' : !row.left ? 'split-diff-cell-empty' : '';
-  const rightCellClass = rightInfo?.type === 'add' ? 'split-diff-cell-add' : !row.right ? 'split-diff-cell-empty' : '';
-
-  // Check for active comment forms and pending comments
-  const leftFormKey = leftInfo ? `${leftInfo.lineNumber}:${leftInfo.side}` : null;
-  const rightFormKey = rightInfo ? `${rightInfo.lineNumber}:${rightInfo.side}` : null;
-  const showLeftForm = isInteractive && leftFormKey && activeFormKey === leftFormKey;
-  const showRightForm = isInteractive && rightFormKey && activeFormKey === rightFormKey;
-
-  const leftComments =
-    isInteractive && leftInfo
-      ? pendingComments.filter((c) => c.line === leftInfo.lineNumber && c.side === 'LEFT' && c.filePath === filePath)
-      : [];
-  const rightComments =
-    isInteractive && rightInfo
-      ? pendingComments.filter((c) => c.line === rightInfo.lineNumber && c.side === 'RIGHT' && c.filePath === filePath)
-      : [];
-
   return (
     <>
-      {/* ── Left side ── */}
-      {isInteractive && (
-        <span
-          className={`split-diff-comment-icon ${leftCellClass}`}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: leftInfo ? 'pointer' : 'default',
-          }}
-          onClick={() => leftInfo && onClickLine(leftInfo)}
-        >
-          {leftInfo && (
-            <MessageSquarePlus
-              style={{ width: '0.75rem', height: '0.75rem', color: '#58a6ff', opacity: 0 }}
-              className="split-icon-hover"
-            />
-          )}
-        </span>
-      )}
-      <span
-        className={`split-diff-line-num ${leftCellClass}`}
-        style={{
-          textAlign: 'right',
-          paddingRight: '0.5ch',
-          color: 'rgba(255,255,255,0.3)',
-          userSelect: 'none',
-          fontSize: '0.75rem',
-          cursor: isInteractive && leftInfo ? 'pointer' : 'default',
-        }}
-        onClick={() => isInteractive && leftInfo && onClickLine(leftInfo)}
-      >
-        {leftLineNum ?? ''}
-      </span>
-      <span
-        className={`split-diff-code ${leftCellClass}`}
-        style={{ paddingLeft: '0.5ch', paddingRight: '1ch', whiteSpace: 'pre' }}
-      >
-        {row.left ? <span dangerouslySetInnerHTML={{ __html: row.left.html }} /> : null}
-      </span>
+      <SplitDiffCell
+        info={row.left?.info ?? null}
+        html={row.left?.html ?? null}
+        cellClass={leftCellClass}
+        isInteractive={isInteractive}
+        onClickLine={onClickLine}
+      />
 
-      {/* ── Separator ── */}
-      <span style={{ background: 'oklch(0.35 0 0)' }} />
+      <span className="split-diff-separator" />
 
-      {/* ── Right side ── */}
-      {isInteractive && (
-        <span
-          className={`split-diff-comment-icon ${rightCellClass}`}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: rightInfo ? 'pointer' : 'default',
-          }}
-          onClick={() => rightInfo && onClickLine(rightInfo)}
-        >
-          {rightInfo && (
-            <MessageSquarePlus
-              style={{ width: '0.75rem', height: '0.75rem', color: '#58a6ff', opacity: 0 }}
-              className="split-icon-hover"
-            />
-          )}
-        </span>
-      )}
-      <span
-        className={`split-diff-line-num ${rightCellClass}`}
-        style={{
-          textAlign: 'right',
-          paddingRight: '0.5ch',
-          color: 'rgba(255,255,255,0.3)',
-          userSelect: 'none',
-          fontSize: '0.75rem',
-          cursor: isInteractive && rightInfo ? 'pointer' : 'default',
-        }}
-        onClick={() => isInteractive && rightInfo && onClickLine(rightInfo)}
-      >
-        {rightLineNum ?? ''}
-      </span>
-      <span
-        className={`split-diff-code ${rightCellClass}`}
-        style={{ paddingLeft: '0.5ch', paddingRight: '1ch', whiteSpace: 'pre' }}
-      >
-        {row.right ? <span dangerouslySetInnerHTML={{ __html: row.right.html }} /> : null}
-      </span>
+      <SplitDiffCell
+        info={row.right?.info ?? null}
+        html={row.right?.html ?? null}
+        cellClass={rightCellClass}
+        isInteractive={isInteractive}
+        onClickLine={onClickLine}
+      />
 
-      {/* ── Comment forms / bubbles (span full width) ── */}
       {showLeftForm && leftInfo && (
-        <div style={{ gridColumn: `1 / ${gridColumnCount + 1}` }}>
+        <div style={fullSpan}>
           <InlineCommentForm onSubmit={(body) => onSubmitComment(body, leftInfo)} onCancel={onCancelForm} />
         </div>
       )}
       {commentCallbacks &&
         leftComments.map((c) => (
-          <div key={c.id} style={{ gridColumn: `1 / ${gridColumnCount + 1}` }}>
+          <div key={c.id} style={fullSpan}>
             <CommentBubble
               comment={c}
               onRemove={commentCallbacks.onRemoveComment}
@@ -256,13 +268,13 @@ function SplitDiffRow({
           </div>
         ))}
       {showRightForm && rightInfo && (
-        <div style={{ gridColumn: `1 / ${gridColumnCount + 1}` }}>
+        <div style={fullSpan}>
           <InlineCommentForm onSubmit={(body) => onSubmitComment(body, rightInfo)} onCancel={onCancelForm} />
         </div>
       )}
       {commentCallbacks &&
         rightComments.map((c) => (
-          <div key={c.id} style={{ gridColumn: `1 / ${gridColumnCount + 1}` }}>
+          <div key={c.id} style={fullSpan}>
             <CommentBubble
               comment={c}
               onRemove={commentCallbacks.onRemoveComment}

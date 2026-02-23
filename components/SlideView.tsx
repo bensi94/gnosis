@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { Eye, MessageCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -10,21 +9,8 @@ import { SplitDiffHunkGroup } from '@/components/SplitDiffHunk';
 import { Markdown } from '@/components/Markdown';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
 import { slideTypeConfig } from '@/lib/constants';
-import type { Slide, DiffHunk, PendingReviewComment, DiffSide } from '@/lib/types';
-
-interface CommentCallbacks {
-  onAddComment: (params: {
-    filePath: string;
-    line: number;
-    side: DiffSide;
-    body: string;
-    hunkHeader: string;
-    codeSnippet: string;
-    slideIndex: number;
-  }) => void;
-  onRemoveComment: (id: string) => void;
-  onEditComment: (id: string, body: string) => void;
-}
+import type { CommentCallbacks } from '@/components/shared-diff-utils';
+import type { Slide, DiffHunk, PendingReviewComment, Preferences } from '@/lib/types';
 
 interface Props {
   slide: Slide;
@@ -32,6 +18,8 @@ interface Props {
   totalSlides: number;
   pendingComments?: PendingReviewComment[];
   commentCallbacks?: CommentCallbacks;
+  diffLayout: Preferences['diffLayout'];
+  onDiffLayoutChange: (layout: Preferences['diffLayout']) => void;
   onAskQuestion?: () => void;
 }
 
@@ -53,8 +41,8 @@ function DiffLayoutToggle({
   value,
   onChange,
 }: {
-  value: 'unified' | 'split';
-  onChange: (v: 'unified' | 'split') => void;
+  value: Preferences['diffLayout'];
+  onChange: (v: Preferences['diffLayout']) => void;
 }) {
   return (
     <div className="inline-flex rounded-md border border-border bg-muted/30 p-0.5 text-xs">
@@ -78,25 +66,18 @@ function DiffLayoutToggle({
   );
 }
 
-export function SlideView({ slide, slideNumber, pendingComments, commentCallbacks, onAskQuestion }: Props) {
+export function SlideView({
+  slide,
+  slideNumber,
+  pendingComments,
+  commentCallbacks,
+  diffLayout,
+  onDiffLayoutChange,
+  onAskQuestion,
+}: Props) {
   const typeConfig = slideTypeConfig[slide.slideType];
   const Icon = typeConfig.icon;
   const groupedHunks = groupHunksByFile(slide.diffHunks);
-
-  const [diffLayout, setDiffLayout] = useState<'unified' | 'split'>('unified');
-
-  useEffect(() => {
-    void window.electronAPI.loadPreferences().then((prefs) => {
-      setDiffLayout(prefs.diffLayout);
-    });
-  }, []);
-
-  function handleLayoutChange(layout: 'unified' | 'split') {
-    setDiffLayout(layout);
-    void window.electronAPI.loadPreferences().then((prefs) => {
-      void window.electronAPI.savePreferences({ ...prefs, diffLayout: layout });
-    });
-  }
 
   return (
     <PanelGroup orientation="horizontal" className="flex flex-1 overflow-hidden">
@@ -175,7 +156,7 @@ export function SlideView({ slide, slideNumber, pendingComments, commentCallback
           <div className="flex items-center justify-between">
             {slide.mermaidDiagram && <p className="text-xs uppercase tracking-wider text-muted-foreground">Diagram</p>}
             <div className="ml-auto">
-              <DiffLayoutToggle value={diffLayout} onChange={handleLayoutChange} />
+              <DiffLayoutToggle value={diffLayout} onChange={onDiffLayoutChange} />
             </div>
           </div>
 

@@ -10,7 +10,15 @@ import { SubmitReviewDialog } from '../../components/SubmitReviewDialog';
 import { SettingsDialog } from '../../components/SettingsDialog';
 import { useReviewComments } from '../../lib/use-review-comments';
 import { useSlideChat } from '../../lib/use-slide-chat';
-import type { ReviewGuide, ReviewEvent, FreshnessResult, PrStatus, Provider, ModelId } from '../../lib/types';
+import type {
+  ReviewGuide,
+  ReviewEvent,
+  FreshnessResult,
+  Preferences,
+  PrStatus,
+  Provider,
+  ModelId,
+} from '../../lib/types';
 
 interface Props {
   review: ReviewGuide;
@@ -29,13 +37,17 @@ export function ReviewPage({ review: initialReview, onBack, onReReview }: Props)
   const [chatOpen, setChatOpen] = useState(false);
   const [chatProvider, setChatProvider] = useState<Provider>('claude');
   const [chatModel, setChatModel] = useState<ModelId>('claude-sonnet-4-6');
+  const [diffLayout, setDiffLayout] = useState<Preferences['diffLayout']>('unified');
+  const [prefs, setPrefs] = useState<Preferences | null>(null);
   const { comments, addComment, removeComment, editComment, clearAll } = useReviewComments();
   const slideChat = useSlideChat(review, chatProvider, chatModel);
 
   useEffect(() => {
-    void window.electronAPI.loadPreferences().then((prefs) => {
-      setChatProvider(prefs.provider);
-      setChatModel(prefs.model);
+    void window.electronAPI.loadPreferences().then((p) => {
+      setPrefs(p);
+      setChatProvider(p.provider);
+      setChatModel(p.model);
+      setDiffLayout(p.diffLayout);
     });
   }, []);
 
@@ -85,6 +97,18 @@ export function ReviewPage({ review: initialReview, onBack, onReReview }: Props)
   const commentCallbacks = useMemo(
     () => ({ onAddComment: addComment, onRemoveComment: removeComment, onEditComment: editComment }),
     [addComment, removeComment, editComment]
+  );
+
+  const handleDiffLayoutChange = useCallback(
+    (layout: Preferences['diffLayout']) => {
+      setDiffLayout(layout);
+      if (prefs) {
+        const updated = { ...prefs, diffLayout: layout };
+        setPrefs(updated);
+        void window.electronAPI.savePreferences(updated);
+      }
+    },
+    [prefs]
   );
 
   async function handleSubmitReview(event: ReviewEvent, body: string) {
@@ -138,6 +162,8 @@ export function ReviewPage({ review: initialReview, onBack, onReReview }: Props)
               totalSlides={review.slides.length}
               pendingComments={comments}
               commentCallbacks={commentCallbacks}
+              diffLayout={diffLayout}
+              onDiffLayoutChange={handleDiffLayoutChange}
               onAskQuestion={() => setChatOpen(true)}
             />
           )}

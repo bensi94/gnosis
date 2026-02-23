@@ -142,8 +142,14 @@ export function buildSplitRows(lineInfos: DiffLineInfo[], lineHtmls: string[]): 
 
     if (info.type === 'context') {
       rows.push({
-        left: { info, html: lineHtmls[i] },
-        right: { info, html: lineHtmls[i] },
+        left: {
+          info: { ...info, lineNumber: info.baseLineNumber ?? info.lineNumber, side: 'LEFT' },
+          html: lineHtmls[i],
+        },
+        right: {
+          info: { ...info, lineNumber: info.headLineNumber ?? info.lineNumber, side: 'RIGHT' },
+          html: lineHtmls[i],
+        },
       });
       i++;
       continue;
