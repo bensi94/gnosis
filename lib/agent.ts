@@ -1,5 +1,5 @@
 import { getProvider } from './provider';
-import type { ModelId, Provider, ReviewGuide } from './types';
+import type { AIReviewGuide, ModelId, Provider } from './types';
 
 // ── System prompt & schema constants ─────────────────────────────
 
@@ -53,14 +53,20 @@ RISK: Assess overall risk based on:
 - Docs and config = low risk
 
 You are given:
-- <full_diff>: the complete unified diff with expanded context (up to 10 lines around each change)
+- <full_diff>: the complete unified diff with expanded context (up to 15 lines around each change)
+- <hunk_index>: a list of all diff hunks with unique IDs, file paths, and change counts
 - <file_contents_before>: full file contents at base ref (before the PR)
 - <file_contents_after>: full file contents at head ref (after the PR)
 - <neighbor_files>: files imported by the changed files
 
 Use file_contents_before and file_contents_after to understand the full shape of each changed file, not just the lines in the diff. Reference surrounding functions, types, and patterns when writing narratives to give the reviewer genuine codebase context.
 
-When generating diffHunks.content, use unified diff format: each line MUST start with '+' (added), '-' (removed), or ' ' (space, for context). Include 10 lines of context before and after each change. Draw from the file contents if the diff context is shorter.
+HUNK ASSIGNMENT: The <hunk_index> lists all diff hunks with unique IDs. For each slide, assign relevant hunk IDs to "diffHunkIds". Rules:
+- Each hunk ID must appear in exactly one slide
+- Every hunk ID must be assigned to some slide
+- If a hunk doesn't fit a specific slide, include it in a final "Other changes" slide
+- Order IDs within each slide by file path (alphabetical), then hunk number (ascending)
+- Do NOT generate diff content — just reference hunks by ID
 
 You must respond with valid JSON matching the ReviewGuide schema exactly. No explanation outside the JSON.`;
 
@@ -87,15 +93,7 @@ The JSON must match this schema exactly:
       "slideType": "foundation" | "feature" | "refactor" | "bugfix" | "test" | "config" | "docs",
       "narrative": string,
       "reviewFocus": string | null,
-      "diffHunks": [
-        {
-          "filePath": string,
-          "hunkHeader": string,
-          "content": string,
-          "language": string,
-          "renderedHtml": ""
-        }
-      ],
+      "diffHunkIds": ["hunk-0", "hunk-3", ...],
       "contextSnippets": string[],
       "affectedFiles": string[],
       "dependsOn": string[],
@@ -106,7 +104,7 @@ The JSON must match this schema exactly:
 
 const CONCISE_SUFFIX = `
 
-IMPORTANT: Be concise. Keep narrative and reviewFocus under 2 sentences each. Omit contextSnippets entirely (use empty arrays). Limit diffHunks to the 3 most important hunks per slide. Return only raw JSON starting with { and ending with }.`;
+IMPORTANT: Be concise. Keep narrative and reviewFocus under 2 sentences each. Omit contextSnippets entirely (use empty arrays). Limit diffHunkIds to the 5 most important hunk IDs per slide. Return only raw JSON starting with { and ending with }.`;
 
 const SIGNAL_BOOST_DIRECTIVE = `
 SIGNAL BOOST MODE — ACTIVE
@@ -128,7 +126,7 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-function validateReviewGuide(obj: unknown): obj is ReviewGuide {
+function validateAIReviewGuide(obj: unknown): obj is AIReviewGuide {
   if (typeof obj !== 'object' || obj === null) return false;
   const o = obj as Record<string, unknown>;
   return (
@@ -153,10 +151,10 @@ export async function generateReviewGuide(
   mcpConfigPath?: string,
   allowedTools?: string[],
   reviewSuggestions: boolean = true
-): Promise<ReviewGuide> {
+): Promise<AIReviewGuide> {
   const provider = getProvider(providerName);
 
-  async function attempt(extraInstruction: string = ''): Promise<ReviewGuide> {
+  async function attempt(extraInstruction: string = ''): Promise<AIReviewGuide> {
     const customInstructions = instructions?.trim();
     const userMessage = customInstructions
       ? contextPackage +
@@ -203,7 +201,7 @@ export async function generateReviewGuide(
       throw new Error(`JSON parse failed: ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    if (!validateReviewGuide(parsed)) {
+    if (!validateAIReviewGuide(parsed)) {
       throw new Error('Response is missing required fields (prTitle, summary, riskLevel, slides)');
     }
 

@@ -20,18 +20,21 @@ import type { CiCheck, PrStatus } from '../lib/types';
 import { buildContextPackage } from '../lib/context-builder';
 import { generateReviewGuide } from '../lib/agent';
 import { checkForUpdate } from '../lib/updater';
-import { renderDiffHunk, inferLanguage, reRenderAllHunks } from '../lib/highlight';
+import { renderDiffHunk, reRenderAllHunks } from '../lib/highlight';
 import { parsePatchValidLines } from '../lib/diff-lines';
 import { setBinaryOverride, detectBinaryPath, resolveBinaryPath } from '../lib/providers/shared';
 import { getProvider } from '../lib/provider';
 import { buildSlideChatSystemPrompt, buildSlideChatUserMessage } from '../lib/chat-agent';
+import { buildIndexedHunks, expandFullDiff, formatHunkIndexForPrompt, sortDiffHunks } from '../lib/diff-parse';
 import { writeMcpConfig, cleanupMcpConfig } from '../lib/mcp-config';
 import type {
+  DiffHunk,
   GenerateReviewRequest,
   ModelId,
   Preferences,
   ReviewGuide,
   ReviewHistoryEntry,
+  Slide,
   SendSlideChatRequest,
   SubmitReviewRequest,
   FreshnessResult,
@@ -665,13 +668,19 @@ ipcMain.handle(
       smartImports ? provider : undefined
     );
 
+    // Parse diff into indexed hunks and build expanded diff
+    const indexedHunks = buildIndexedHunks(diff, fileContents, headFileContents);
+    const expandedDiff = expandFullDiff(diff, fileContents, headFileContents);
+    const hunkIndex = formatHunkIndexForPrompt(indexedHunks);
+
     const contextPackage = buildContextPackage(
       prData,
-      diff,
+      expandedDiff,
       changedFiles,
       fileContents,
       headFileContents,
-      neighborFiles
+      neighborFiles,
+      hunkIndex
     );
 
     console.log('[main] Generating review guide...');
@@ -690,9 +699,9 @@ ipcMain.handle(
       }
     }
 
-    let reviewGuide: ReviewGuide;
+    let aiResult;
     try {
-      reviewGuide = await generateReviewGuide(
+      aiResult = await generateReviewGuide(
         contextPackage,
         prUrl,
         provider,
@@ -711,22 +720,93 @@ ipcMain.handle(
 
     const generationDurationMs = Date.now() - generationStart;
 
-    reviewGuide.prTitle = reviewGuide.prTitle || prData.title;
-    reviewGuide.prDescription = reviewGuide.prDescription || prData.description;
-    reviewGuide.author = reviewGuide.author || prData.author;
-    reviewGuide.prUrl = prUrl;
-    reviewGuide.headSha = prData.headSha;
-    reviewGuide.totalFilesChanged = changedFiles.length;
-    reviewGuide.totalLinesChanged = changedFiles.reduce((sum, f) => sum + f.additions + f.deletions, 0);
-    reviewGuide.neighborFileCount = Object.keys(neighborFiles).length;
-    reviewGuide.generationDurationMs = generationDurationMs;
+    // Resolve hunk IDs → real DiffHunk objects
+    const hunkMap = new Map(indexedHunks.map((h) => [h.id, h]));
+    const assignedIds = new Set<string>();
 
+    const resolvedSlides: Slide[] = aiResult.slides.map((aiSlide) => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AI response may omit fields
+      const ids = aiSlide.diffHunkIds ?? [];
+      const diffHunks: DiffHunk[] = ids
+        .filter((id: string) => hunkMap.has(id) && !assignedIds.has(id))
+        .map((id: string) => {
+          assignedIds.add(id);
+          // Safe: filter above guarantees hunkMap.has(id)
+          const h = hunkMap.get(id);
+          if (!h) throw new Error(`Hunk ${id} not found in index`);
+          return {
+            filePath: h.filePath,
+            hunkHeader: h.expandedHunkHeader,
+            content: h.expandedContent,
+            language: h.language,
+            renderedHtml: '',
+          };
+        });
+
+      return {
+        id: aiSlide.id,
+        slideNumber: aiSlide.slideNumber,
+        title: aiSlide.title,
+        slideType: aiSlide.slideType,
+        narrative: aiSlide.narrative,
+        reviewFocus: aiSlide.reviewFocus,
+        diffHunks: sortDiffHunks(diffHunks),
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AI response may omit fields
+        contextSnippets: aiSlide.contextSnippets ?? [],
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AI response may omit fields
+        affectedFiles: aiSlide.affectedFiles ?? [],
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- AI response may omit fields
+        dependsOn: aiSlide.dependsOn ?? [],
+        mermaidDiagram: aiSlide.mermaidDiagram,
+      };
+    });
+
+    // Catch-all slide for unassigned hunks
+    const unassigned = indexedHunks.filter((h) => !assignedIds.has(h.id));
+    if (unassigned.length > 0) {
+      const otherHunks: DiffHunk[] = unassigned.map((h) => ({
+        filePath: h.filePath,
+        hunkHeader: h.expandedHunkHeader,
+        content: h.expandedContent,
+        language: h.language,
+        renderedHtml: '',
+      }));
+
+      resolvedSlides.push({
+        id: 'other-changes',
+        slideNumber: resolvedSlides.length + 1,
+        title: 'Other changes',
+        slideType: 'refactor',
+        narrative: 'Additional changes not covered in previous slides.',
+        reviewFocus: null,
+        diffHunks: sortDiffHunks(otherHunks),
+        contextSnippets: [],
+        affectedFiles: [...new Set(unassigned.map((h) => h.filePath))],
+        dependsOn: [],
+        mermaidDiagram: null,
+      });
+    }
+
+    const reviewGuide: ReviewGuide = {
+      prTitle: aiResult.prTitle || prData.title,
+      prDescription: aiResult.prDescription || prData.description,
+      prUrl,
+      author: aiResult.author || prData.author,
+      summary: aiResult.summary,
+      riskLevel: aiResult.riskLevel,
+      riskRationale: aiResult.riskRationale,
+      totalFilesChanged: changedFiles.length,
+      totalLinesChanged: changedFiles.reduce((sum, f) => sum + f.additions + f.deletions, 0),
+      neighborFileCount: Object.keys(neighborFiles).length,
+      generationDurationMs,
+      slides: resolvedSlides,
+      headSha: prData.headSha,
+    };
+
+    // Render syntax-highlighted HTML for each hunk
     const codeTheme = loadPreferences().codeTheme;
     for (const slide of reviewGuide.slides) {
       for (const hunk of slide.diffHunks) {
-        if (!hunk.language) {
-          hunk.language = inferLanguage(hunk.filePath);
-        }
         try {
           hunk.renderedHtml = await renderDiffHunk(hunk.content, hunk.language, codeTheme, hunk.hunkHeader);
         } catch (err) {

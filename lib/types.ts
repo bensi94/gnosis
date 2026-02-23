@@ -34,6 +34,34 @@ export interface Slide {
   mermaidDiagram?: string | null;
 }
 
+// Intermediate types for raw AI response (before hunk resolution)
+export interface AISlide {
+  id: string;
+  slideNumber: number;
+  title: string;
+  slideType: SlideType;
+  narrative: string;
+  reviewFocus: string | null;
+  diffHunkIds: string[];
+  contextSnippets: string[];
+  affectedFiles: string[];
+  dependsOn: string[];
+  mermaidDiagram?: string | null;
+}
+
+export interface AIReviewGuide {
+  prTitle: string;
+  prDescription: string;
+  prUrl: string;
+  author: string;
+  summary: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  riskRationale: string;
+  totalFilesChanged: number;
+  totalLinesChanged: number;
+  slides: AISlide[];
+}
+
 export interface ReviewGuide {
   prTitle: string;
   prDescription: string;
