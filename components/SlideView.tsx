@@ -5,24 +5,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DiffHunkGroup } from '@/components/DiffHunk';
 import { InteractiveDiffHunkGroup } from '@/components/InteractiveDiffHunk';
+import { SplitDiffHunkGroup } from '@/components/SplitDiffHunk';
 import { Markdown } from '@/components/Markdown';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
 import { slideTypeConfig } from '@/lib/constants';
-import type { Slide, DiffHunk, PendingReviewComment, DiffSide } from '@/lib/types';
-
-interface CommentCallbacks {
-  onAddComment: (params: {
-    filePath: string;
-    line: number;
-    side: DiffSide;
-    body: string;
-    hunkHeader: string;
-    codeSnippet: string;
-    slideIndex: number;
-  }) => void;
-  onRemoveComment: (id: string) => void;
-  onEditComment: (id: string, body: string) => void;
-}
+import type { CommentCallbacks } from '@/components/shared-diff-utils';
+import type { Slide, DiffHunk, PendingReviewComment, Preferences } from '@/lib/types';
 
 interface Props {
   slide: Slide;
@@ -30,6 +18,8 @@ interface Props {
   totalSlides: number;
   pendingComments?: PendingReviewComment[];
   commentCallbacks?: CommentCallbacks;
+  diffLayout: Preferences['diffLayout'];
+  onDiffLayoutChange: (layout: Preferences['diffLayout']) => void;
   onAskQuestion?: () => void;
 }
 
@@ -47,7 +37,44 @@ function groupHunksByFile(hunks: DiffHunk[]): { filePath: string; hunks: DiffHun
   return Array.from(map.entries()).map(([filePath, hunks]) => ({ filePath, hunks }));
 }
 
-export function SlideView({ slide, slideNumber, pendingComments, commentCallbacks, onAskQuestion }: Props) {
+function DiffLayoutToggle({
+  value,
+  onChange,
+}: {
+  value: Preferences['diffLayout'];
+  onChange: (v: Preferences['diffLayout']) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-md border border-border bg-muted/30 p-0.5 text-xs">
+      <button
+        className={`px-2.5 py-1 rounded-sm transition-colors ${
+          value === 'unified' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+        }`}
+        onClick={() => onChange('unified')}
+      >
+        Unified
+      </button>
+      <button
+        className={`px-2.5 py-1 rounded-sm transition-colors ${
+          value === 'split' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+        }`}
+        onClick={() => onChange('split')}
+      >
+        Split
+      </button>
+    </div>
+  );
+}
+
+export function SlideView({
+  slide,
+  slideNumber,
+  pendingComments,
+  commentCallbacks,
+  diffLayout,
+  onDiffLayoutChange,
+  onAskQuestion,
+}: Props) {
   const typeConfig = slideTypeConfig[slide.slideType];
   const Icon = typeConfig.icon;
   const groupedHunks = groupHunksByFile(slide.diffHunks);
@@ -97,7 +124,7 @@ export function SlideView({ slide, slideNumber, pendingComments, commentCallback
           {slide.contextSnippets.length > 0 && (
             <details className="group">
               <summary className="cursor-pointer text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground select-none list-none flex items-center gap-1">
-                <span className="group-open:rotate-90 inline-block transition-transform">▶</span>
+                <span className="group-open:rotate-90 inline-block transition-transform">&#x25B6;</span>
                 Codebase context
               </summary>
               <div className="mt-3 space-y-3">
@@ -126,17 +153,32 @@ export function SlideView({ slide, slideNumber, pendingComments, commentCallback
       {/* Right panel — diagram + diffs */}
       <Panel defaultSize={60} minSize={30} className="overflow-y-auto min-h-0">
         <div className="p-6 flex flex-col gap-4">
-          {slide.mermaidDiagram && (
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Diagram</p>
-              <MermaidDiagram chart={slide.mermaidDiagram} />
+          <div className="flex items-center justify-between">
+            {slide.mermaidDiagram && <p className="text-xs uppercase tracking-wider text-muted-foreground">Diagram</p>}
+            <div className="ml-auto">
+              <DiffLayoutToggle value={diffLayout} onChange={onDiffLayoutChange} />
             </div>
-          )}
+          </div>
+
+          {slide.mermaidDiagram && <MermaidDiagram chart={slide.mermaidDiagram} />}
+
           {groupedHunks.length === 0 && (
             <p className="text-sm text-muted-foreground italic">No diff hunks for this slide.</p>
           )}
-          {groupedHunks.map(({ filePath, hunks }) =>
-            commentCallbacks ? (
+          {groupedHunks.map(({ filePath, hunks }) => {
+            if (diffLayout === 'split') {
+              return (
+                <SplitDiffHunkGroup
+                  key={filePath}
+                  filePath={filePath}
+                  hunks={hunks}
+                  pendingComments={pendingComments}
+                  slideIndex={slideNumber}
+                  commentCallbacks={commentCallbacks}
+                />
+              );
+            }
+            return commentCallbacks ? (
               <InteractiveDiffHunkGroup
                 key={filePath}
                 filePath={filePath}
@@ -149,8 +191,8 @@ export function SlideView({ slide, slideNumber, pendingComments, commentCallback
               />
             ) : (
               <DiffHunkGroup key={filePath} filePath={filePath} hunks={hunks} />
-            )
-          )}
+            );
+          })}
         </div>
       </Panel>
     </PanelGroup>

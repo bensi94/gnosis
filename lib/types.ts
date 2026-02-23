@@ -153,6 +153,7 @@ export interface Preferences {
   codeFont: string;
   claudePath: string;
   geminiPath: string;
+  diffLayout: 'unified' | 'split';
 }
 
 export interface SendSlideChatRequest {

@@ -2,9 +2,16 @@ import type { DiffSide } from './types';
 
 export interface DiffLineInfo {
   lineNumber: number;
+  baseLineNumber: number | null;
+  headLineNumber: number | null;
   side: DiffSide;
   type: 'add' | 'remove' | 'context';
   text: string;
+}
+
+export interface SplitRow {
+  left: { info: DiffLineInfo; html: string } | null;
+  right: { info: DiffLineInfo; html: string } | null;
 }
 
 /**
@@ -59,23 +66,58 @@ export function parseDiffLines(hunkHeader: string, content: string): DiffLineInf
       const text = line.slice(1);
 
       if (prefix === '+') {
-        result.push({ lineNumber: newLine, side: 'RIGHT', type: 'add', text });
+        result.push({
+          lineNumber: newLine,
+          baseLineNumber: null,
+          headLineNumber: newLine,
+          side: 'RIGHT',
+          type: 'add',
+          text,
+        });
         newLine++;
       } else if (prefix === '-') {
-        result.push({ lineNumber: oldLine, side: 'LEFT', type: 'remove', text });
+        result.push({
+          lineNumber: oldLine,
+          baseLineNumber: oldLine,
+          headLineNumber: null,
+          side: 'LEFT',
+          type: 'remove',
+          text,
+        });
         oldLine++;
       } else {
-        result.push({ lineNumber: newLine, side: 'RIGHT', type: 'context', text });
+        result.push({
+          lineNumber: newLine,
+          baseLineNumber: oldLine,
+          headLineNumber: newLine,
+          side: 'RIGHT',
+          type: 'context',
+          text,
+        });
         oldLine++;
         newLine++;
       }
     } else {
       // No diff markers — use full line text
       if (isNewFile) {
-        result.push({ lineNumber: newLine, side: 'RIGHT', type: 'add', text: line });
+        result.push({
+          lineNumber: newLine,
+          baseLineNumber: null,
+          headLineNumber: newLine,
+          side: 'RIGHT',
+          type: 'add',
+          text: line,
+        });
         newLine++;
       } else {
-        result.push({ lineNumber: newLine, side: 'RIGHT', type: 'context', text: line });
+        result.push({
+          lineNumber: newLine,
+          baseLineNumber: oldLine,
+          headLineNumber: newLine,
+          side: 'RIGHT',
+          type: 'context',
+          text: line,
+        });
         oldLine++;
         newLine++;
       }
@@ -83,6 +125,59 @@ export function parseDiffLines(hunkHeader: string, content: string): DiffLineInf
   }
 
   return result;
+}
+
+/**
+ * Build side-by-side split rows from parsed diff lines and their corresponding
+ * Shiki HTML. Context lines appear on both sides. Change chunks (contiguous
+ * removes followed by adds) are zipped into paired rows, with the shorter
+ * side padded with null.
+ */
+export function buildSplitRows(lineInfos: DiffLineInfo[], lineHtmls: string[]): SplitRow[] {
+  const rows: SplitRow[] = [];
+  let i = 0;
+
+  while (i < lineInfos.length) {
+    const info = lineInfos[i];
+
+    if (info.type === 'context') {
+      rows.push({
+        left: {
+          info: { ...info, lineNumber: info.baseLineNumber ?? info.lineNumber, side: 'LEFT' },
+          html: lineHtmls[i],
+        },
+        right: {
+          info: { ...info, lineNumber: info.headLineNumber ?? info.lineNumber, side: 'RIGHT' },
+          html: lineHtmls[i],
+        },
+      });
+      i++;
+      continue;
+    }
+
+    // Collect a contiguous change chunk: removes then adds
+    const removes: { info: DiffLineInfo; html: string }[] = [];
+    const adds: { info: DiffLineInfo; html: string }[] = [];
+
+    while (i < lineInfos.length && lineInfos[i].type === 'remove') {
+      removes.push({ info: lineInfos[i], html: lineHtmls[i] });
+      i++;
+    }
+    while (i < lineInfos.length && lineInfos[i].type === 'add') {
+      adds.push({ info: lineInfos[i], html: lineHtmls[i] });
+      i++;
+    }
+
+    const maxLen = Math.max(removes.length, adds.length);
+    for (let j = 0; j < maxLen; j++) {
+      rows.push({
+        left: j < removes.length ? removes[j] : null,
+        right: j < adds.length ? adds[j] : null,
+      });
+    }
+  }
+
+  return rows;
 }
 
 /**

@@ -365,6 +365,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   codeFont: 'jetbrains-mono',
   claudePath: '',
   geminiPath: '',
+  diffLayout: 'unified',
 };
 
 function applyBinaryOverrides(prefs: Preferences): void {
