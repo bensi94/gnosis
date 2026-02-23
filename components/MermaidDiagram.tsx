@@ -57,7 +57,7 @@ export function MermaidDiagram({ chart }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group relative w-full rounded-md bg-muted/30 p-3 cursor-pointer transition-colors hover:bg-muted/50 text-left"
+        className="group relative w-full rounded-md bg-muted/30 p-3 cursor-pointer transition-colors hover:bg-muted/50 text-left max-h-[600px] overflow-y-auto"
       >
         <div ref={ref} />
         <span className="absolute top-2 right-2 rounded-md bg-background/60 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
