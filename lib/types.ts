@@ -79,6 +79,7 @@ export interface ReviewGuide {
   totalFilesChanged: number;
   totalLinesChanged: number;
   neighborFileCount?: number;
+  excludedFiles?: string[];
   generationDurationMs?: number;
   slides: Slide[];
   headSha?: string;
