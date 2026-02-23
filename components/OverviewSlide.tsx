@@ -17,6 +17,7 @@ import {
   Users,
   Zap,
   Milestone,
+  Globe,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -216,6 +217,7 @@ function StatusBar({ status }: { status: PrStatus | null }) {
 export function OverviewSlide({ review, prStatus, onNavigate }: Props) {
   const risk = riskConfig[review.riskLevel];
   const [descOpen, setDescOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   return (
     <div className="flex-1 overflow-y-auto p-8">
@@ -264,6 +266,35 @@ export function OverviewSlide({ review, prStatus, onNavigate }: Props) {
                 <div className="text-sm text-muted-foreground leading-relaxed max-h-48 overflow-y-auto rounded-md border bg-muted/20 px-4 py-3">
                   <Markdown>{review.prDescription}</Markdown>
                 </div>
+              )}
+            </section>
+          )}
+
+          {/* Web Sources — collapsible */}
+          {review.webSources && review.webSources.length > 0 && (
+            <section className="animate-fade-in-up flex flex-col gap-2" style={{ animationDelay: '180ms' }}>
+              <button
+                onClick={() => setSourcesOpen((v) => !v)}
+                className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 hover:text-foreground transition-colors"
+              >
+                <Globe className="h-3 w-3" />
+                Web Sources ({review.webSources.length})
+                {sourcesOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              </button>
+              {sourcesOpen && (
+                <ul className="flex flex-col gap-1.5 rounded-md border bg-muted/20 px-4 py-3">
+                  {review.webSources.map((source, i) => (
+                    <li key={i}>
+                      <button
+                        onClick={() => window.electronAPI.openExternal(source.url)}
+                        className="text-sm text-primary hover:underline truncate max-w-full text-left"
+                        title={source.url}
+                      >
+                        {source.title || source.url}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </section>
           )}

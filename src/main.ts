@@ -361,6 +361,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   smartImports: true,
   reviewSuggestions: true,
   enableTools: false,
+  enableWebResearch: false,
   codeTheme: 'aurora-x',
   codeFont: 'jetbrains-mono',
   claudePath: '',
@@ -617,6 +618,7 @@ ipcMain.handle(
       signalBoost,
       smartImports,
       reviewSuggestions,
+      webResearch,
     }: GenerateReviewRequest
   ) => {
     const token = getResolvedToken();
@@ -698,6 +700,8 @@ ipcMain.handle(
       } else {
         allowedTools = WEB_ONLY_TOOLS;
       }
+    } else if (webResearch && provider === 'claude') {
+      allowedTools = WEB_ONLY_TOOLS;
     }
 
     let aiResult;
@@ -713,7 +717,9 @@ ipcMain.handle(
         signalBoost ?? false,
         mcpConfigPath,
         allowedTools,
-        reviewSuggestions ?? true
+        reviewSuggestions ?? true,
+        webResearch ?? false,
+        (toolName) => _event.sender.send('review-tool-use', { toolName })
       );
     } finally {
       if (mcpConfigPath) cleanupMcpConfig(mcpConfigPath);
@@ -802,6 +808,7 @@ ipcMain.handle(
       generationDurationMs,
       slides: resolvedSlides,
       headSha: prData.headSha,
+      webSources: aiResult.webSources,
     };
 
     // Render syntax-highlighted HTML for each hunk
@@ -839,6 +846,8 @@ ipcMain.handle('send-slide-chat', async (_event, req: SendSlideChatRequest) => {
     } else {
       allowedTools = WEB_ONLY_TOOLS;
     }
+  } else if (prefs.enableWebResearch && req.provider === 'claude') {
+    allowedTools = WEB_ONLY_TOOLS;
   }
 
   try {

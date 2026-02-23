@@ -115,6 +115,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [signalBoost, setSignalBoost] = useState(true);
   const [smartImports, setSmartImports] = useState(true);
   const [reviewSuggestions, setReviewSuggestions] = useState(true);
+  const [webResearch, setWebResearch] = useState(false);
   const [instructions, setInstructions] = useState('');
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -127,6 +128,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cliNotFound, setCliNotFound] = useState<{ provider: string } | null>(null);
   const [expandedPRs, setExpandedPRs] = useState<Set<string>>(new Set());
+  const [activeToolCall, setActiveToolCall] = useState<string | null>(null);
 
   const prGroups = useMemo(() => groupReviewsByPR(history), [history]);
 
@@ -143,6 +145,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
       setSignalBoost(prefs.signalBoost);
       setSmartImports(prefs.smartImports);
       setReviewSuggestions(prefs.reviewSuggestions);
+      setWebResearch(prefs.enableWebResearch);
       setPrefsLoaded(true);
     });
   }, []);
@@ -159,17 +162,18 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
           signalBoost,
           smartImports,
           reviewSuggestions,
+          enableWebResearch: webResearch,
           ...overrides,
         });
       });
     },
-    [instructions, provider, model, thinking, signalBoost, smartImports, reviewSuggestions]
+    [instructions, provider, model, thinking, signalBoost, smartImports, reviewSuggestions, webResearch]
   );
 
   // Auto-save when toggles or model/provider change (skip initial load)
   useEffect(() => {
     if (prefsLoaded) savePrefs();
-  }, [prefsLoaded, provider, model, thinking, signalBoost, smartImports, reviewSuggestions, savePrefs]);
+  }, [prefsLoaded, provider, model, thinking, signalBoost, smartImports, reviewSuggestions, webResearch, savePrefs]);
 
   async function handleSignIn() {
     setAuthError(null);
@@ -204,16 +208,22 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
 
     setStreamingText('');
     setIsThinkingPhase(false);
+    setActiveToolCall(null);
     setLoading(true);
 
     window.electronAPI.offReviewProgress();
+    window.electronAPI.offReviewToolUse();
     window.electronAPI.onReviewProgress((chunk, isThinking) => {
       if (isThinking) {
         setIsThinkingPhase(true);
       } else {
         setIsThinkingPhase(false);
+        setActiveToolCall(null);
         setStreamingText((prev) => prev + chunk);
       }
+    });
+    window.electronAPI.onReviewToolUse((toolName) => {
+      setActiveToolCall(toolName);
     });
 
     try {
@@ -226,6 +236,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
         signalBoost,
         smartImports,
         reviewSuggestions,
+        webResearch,
       });
       void window.electronAPI.listReviews().then(setHistory);
       onReviewReady(review);
@@ -234,6 +245,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
       setLoading(false);
     } finally {
       window.electronAPI.offReviewProgress();
+      window.electronAPI.offReviewToolUse();
     }
   }
 
@@ -271,6 +283,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
       <LoadingScreen
         message={isThinkingPhase ? 'Thinking...' : 'Generating review guide...'}
         streamingText={streamingText}
+        activeToolCall={activeToolCall}
       />
     );
   }
@@ -498,6 +511,16 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                     checked={reviewSuggestions}
                     onToggle={() => setReviewSuggestions((r) => !r)}
                   />
+
+                  {provider === 'claude' && (
+                    <ToggleSwitch
+                      id="web-research"
+                      label="Web research"
+                      description="Search for framework docs and best practices (slower)"
+                      checked={webResearch}
+                      onToggle={() => setWebResearch((w) => !w)}
+                    />
+                  )}
 
                   {error && (
                     <Alert variant="destructive">

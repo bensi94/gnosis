@@ -23,7 +23,7 @@ export const claudeProvider: LLMProvider = {
     { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', quick: true },
   ],
 
-  async generate({ content, systemPrompt, model, thinking, onChunk, mcpConfigPath, allowedTools }) {
+  async generate({ content, systemPrompt, model, thinking, onChunk, onToolUse, mcpConfigPath, allowedTools }) {
     const claudePath = resolveClaudePath();
     let fullText = '';
 
@@ -44,7 +44,15 @@ export const claudeProvider: LLMProvider = {
         }
         if (outer.type !== 'stream_event') return;
         const inner = outer.event as Record<string, unknown> | undefined;
-        if (!inner || inner.type !== 'content_block_delta') return;
+        if (!inner) return;
+        if (inner.type === 'content_block_start') {
+          const block = inner.content_block as Record<string, unknown> | undefined;
+          if (block?.type === 'tool_use' && typeof block.name === 'string') {
+            onToolUse?.(block.name);
+          }
+          return;
+        }
+        if (inner.type !== 'content_block_delta') return;
         const delta = inner.delta as Record<string, unknown> | undefined;
         if (!delta) return;
         if (delta.type === 'thinking_delta' && typeof delta.thinking === 'string') {
@@ -61,10 +69,10 @@ export const claudeProvider: LLMProvider = {
     const toolArgs: string[] = [];
     if (mcpConfigPath) {
       toolArgs.push('--mcp-config', mcpConfigPath, '--strict-mcp-config');
-      if (allowedTools && allowedTools.length > 0) {
-        toolArgs.push('--allowedTools', allowedTools.join(','));
-      }
-    } else {
+    }
+    if (allowedTools && allowedTools.length > 0) {
+      toolArgs.push('--allowedTools', allowedTools.join(','));
+    } else if (!mcpConfigPath) {
       toolArgs.push('--tools', '');
     }
 
