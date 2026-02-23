@@ -114,6 +114,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [thinking, setThinking] = useState(true);
   const [signalBoost, setSignalBoost] = useState(true);
   const [smartImports, setSmartImports] = useState(true);
+  const [reviewSuggestions, setReviewSuggestions] = useState(true);
   const [instructions, setInstructions] = useState('');
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -141,6 +142,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
       setThinking(prefs.thinking);
       setSignalBoost(prefs.signalBoost);
       setSmartImports(prefs.smartImports);
+      setReviewSuggestions(prefs.reviewSuggestions);
       setPrefsLoaded(true);
     });
   }, []);
@@ -156,17 +158,18 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
           thinking,
           signalBoost,
           smartImports,
+          reviewSuggestions,
           ...overrides,
         });
       });
     },
-    [instructions, provider, model, thinking, signalBoost, smartImports]
+    [instructions, provider, model, thinking, signalBoost, smartImports, reviewSuggestions]
   );
 
   // Auto-save when toggles or model/provider change (skip initial load)
   useEffect(() => {
     if (prefsLoaded) savePrefs();
-  }, [prefsLoaded, provider, model, thinking, signalBoost, smartImports, savePrefs]);
+  }, [prefsLoaded, provider, model, thinking, signalBoost, smartImports, reviewSuggestions, savePrefs]);
 
   async function handleSignIn() {
     setAuthError(null);
@@ -222,6 +225,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
         thinking,
         signalBoost,
         smartImports,
+        reviewSuggestions,
       });
       void window.electronAPI.listReviews().then(setHistory);
       onReviewReady(review);
@@ -485,6 +489,14 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                     checked={smartImports}
                     onToggle={() => setSmartImports((s) => !s)}
                     badge="Experimental"
+                  />
+
+                  <ToggleSwitch
+                    id="review-suggestions"
+                    label="Review suggestions"
+                    description="Generate 'What to check' for each slide"
+                    checked={reviewSuggestions}
+                    onToggle={() => setReviewSuggestions((r) => !r)}
                   />
 
                   {error && (

@@ -356,6 +356,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   thinking: true,
   signalBoost: true,
   smartImports: true,
+  reviewSuggestions: true,
   enableTools: false,
   codeTheme: 'aurora-x',
   codeFont: 'jetbrains-mono',
@@ -603,7 +604,16 @@ ipcMain.handle(
   'generate-review',
   async (
     _event,
-    { prUrl, provider, model, instructions, thinking, signalBoost, smartImports }: GenerateReviewRequest
+    {
+      prUrl,
+      provider,
+      model,
+      instructions,
+      thinking,
+      signalBoost,
+      smartImports,
+      reviewSuggestions,
+    }: GenerateReviewRequest
   ) => {
     const token = getResolvedToken();
     const octokit = new Octokit({ auth: token ?? undefined });
@@ -692,7 +702,8 @@ ipcMain.handle(
         thinking ?? false,
         signalBoost ?? false,
         mcpConfigPath,
-        allowedTools
+        allowedTools,
+        reviewSuggestions ?? true
       );
     } finally {
       if (mcpConfigPath) cleanupMcpConfig(mcpConfigPath);

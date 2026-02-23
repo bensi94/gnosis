@@ -26,7 +26,7 @@ export interface Slide {
   title: string;
   slideType: SlideType;
   narrative: string;
-  reviewFocus: string;
+  reviewFocus: string | null;
   diffHunks: DiffHunk[];
   contextSnippets: string[];
   affectedFiles: string[];
@@ -119,6 +119,7 @@ export interface Preferences {
   thinking: boolean;
   signalBoost: boolean;
   smartImports: boolean;
+  reviewSuggestions: boolean;
   enableTools: boolean;
   codeTheme: string;
   codeFont: string;
@@ -132,7 +133,7 @@ export interface SendSlideChatRequest {
   summary: string;
   slideTitle: string;
   slideNarrative: string;
-  slideReviewFocus: string;
+  slideReviewFocus: string | null;
   affectedFiles: string[];
   diffContent: string;
   history: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -149,6 +150,7 @@ export interface GenerateReviewRequest {
   thinking?: boolean;
   signalBoost?: boolean;
   smartImports?: boolean;
+  reviewSuggestions?: boolean;
 }
 
 export interface GenerateReviewResponse {

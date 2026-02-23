@@ -20,7 +20,7 @@ Description: ${req.prDescription}
   parts.push(`<slide_context>
 Title: ${req.slideTitle}
 Narrative: ${req.slideNarrative}
-Review focus: ${req.slideReviewFocus}
+Review focus: ${req.slideReviewFocus ?? 'N/A'}
 Affected files: ${req.affectedFiles.join(', ')}
 </slide_context>`);
 
