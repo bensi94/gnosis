@@ -69,13 +69,15 @@ export function SlideView({ slide, slideNumber, pendingComments, commentCallback
           <Markdown className="text-sm text-muted-foreground leading-relaxed">{slide.narrative}</Markdown>
 
           {/* Review focus */}
-          <div className="review-focus-callout rounded-lg border-l-2 border-l-primary bg-primary/[0.06] px-4 py-3">
-            <p className="text-xs uppercase tracking-wider text-primary/70 flex items-center gap-1.5 mb-2">
-              <Eye className="h-3 w-3" />
-              What to check
-            </p>
-            <Markdown className="text-sm review-focus-content">{slide.reviewFocus}</Markdown>
-          </div>
+          {slide.reviewFocus && (
+            <div className="review-focus-callout rounded-lg border-l-2 border-l-primary bg-primary/[0.06] px-4 py-3">
+              <p className="text-xs uppercase tracking-wider text-primary/70 flex items-center gap-1.5 mb-2">
+                <Eye className="h-3 w-3" />
+                What to check
+              </p>
+              <Markdown className="text-sm review-focus-content">{slide.reviewFocus}</Markdown>
+            </div>
+          )}
 
           {/* Affected files */}
           {slide.affectedFiles.length > 0 && (

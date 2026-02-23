@@ -12,13 +12,13 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   slideTitle: string;
-  reviewFocus: string;
+  reviewFocus: string | null;
   messages: ChatMessage[];
   isStreaming: boolean;
   onSend: (text: string) => void;
 }
 
-function SuggestedQuestions({ reviewFocus, onSelect }: { reviewFocus: string; onSelect: (q: string) => void }) {
+function SuggestedQuestions({ reviewFocus, onSelect }: { reviewFocus: string | null; onSelect: (q: string) => void }) {
   const suggestions = buildSuggestions(reviewFocus);
   if (suggestions.length === 0) return null;
 
@@ -40,9 +40,9 @@ function SuggestedQuestions({ reviewFocus, onSelect }: { reviewFocus: string; on
   );
 }
 
-function buildSuggestions(reviewFocus: string): string[] {
+function buildSuggestions(reviewFocus: string | null): string[] {
   const suggestions: string[] = [];
-  const lower = reviewFocus.toLowerCase();
+  const lower = (reviewFocus ?? '').toLowerCase();
 
   if (lower.includes('error') || lower.includes('edge case') || lower.includes('validation')) {
     suggestions.push('What edge cases could break this code?');

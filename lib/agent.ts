@@ -86,7 +86,7 @@ The JSON must match this schema exactly:
       "title": string,
       "slideType": "foundation" | "feature" | "refactor" | "bugfix" | "test" | "config" | "docs",
       "narrative": string,
-      "reviewFocus": string,
+      "reviewFocus": string | null,
       "diffHunks": [
         {
           "filePath": string,
@@ -151,7 +151,8 @@ export async function generateReviewGuide(
   thinking: boolean = false,
   signalBoost: boolean = false,
   mcpConfigPath?: string,
-  allowedTools?: string[]
+  allowedTools?: string[],
+  reviewSuggestions: boolean = true
 ): Promise<ReviewGuide> {
   const provider = getProvider(providerName);
 
@@ -164,7 +165,13 @@ export async function generateReviewGuide(
         `\n\n<reviewer_instructions>\nThe reviewer has provided custom instructions that MUST take priority over default style guidelines.\n${customInstructions}\n</reviewer_instructions>`
       : contextPackage + USER_SUFFIX + extraInstruction;
 
-    const baseSystem = signalBoost ? `${SIGNAL_BOOST_DIRECTIVE}\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
+    const reviewSuggestionsDirective = reviewSuggestions
+      ? ''
+      : `\nREVIEW SUGGESTIONS DISABLED: The reviewer has turned off review suggestions. Set "reviewFocus" to null for every slide. Do not generate any review focus content.\n`;
+
+    const baseSystem = signalBoost
+      ? `${SIGNAL_BOOST_DIRECTIVE}\n${SYSTEM_PROMPT}${reviewSuggestionsDirective}`
+      : `${SYSTEM_PROMPT}${reviewSuggestionsDirective}`;
 
     const system = customInstructions
       ? `${baseSystem}\n\nIMPORTANT — CUSTOM REVIEWER INSTRUCTIONS:\nThe reviewer has provided the following instructions. These take precedence over the default writing style and tone guidelines above. Adapt your narrative, reviewFocus, summary, and all prose fields accordingly.\n\n<instructions>\n${customInstructions}\n</instructions>`
