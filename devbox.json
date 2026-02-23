@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.14.2/.schema/devbox.schema.json",
+  "packages": ["nodejs@20", "go-task@latest", "pre-commit@latest", "trufflehog@latest"],
+  "shell": {
+    "init_hook": [
+      "echo 'Welcome to Gnosis devbox!' > /dev/null",
+      "if [ -n \"$ZSH_VERSION\" ]; then eval \"$(task --completion zsh 2>/dev/null)\" || true; elif [ -n \"$BASH_VERSION\" ]; then eval \"$(task --completion bash 2>/dev/null)\" || true; fi"
+    ],
+    "scripts": {}
+  }
+}

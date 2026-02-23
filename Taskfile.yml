@@ -1,6 +1,11 @@
 version: '3'
 
 tasks:
+  setup:
+    desc: Bootstrap development environment
+    cmds:
+      - npm install
+
   dev:
     desc: Start development server
     cmds:
