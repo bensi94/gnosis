@@ -85,7 +85,7 @@ Prerequisites: [devbox](https://www.jetify.com/docs/devbox/installing_devbox/) a
 git clone https://github.com/oddur/gnosis.git
 cd gnosis
 direnv allow   # activates devbox automatically on cd
-task setup     # installs npm deps + pre-commit hooks
+task setup     # installs npm deps
 task dev       # starts the Electron dev server
 ```
 

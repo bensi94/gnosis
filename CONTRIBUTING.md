@@ -13,7 +13,7 @@ Install these two tools (everything else is handled by devbox):
 git clone https://github.com/oddur/gnosis.git
 cd gnosis
 direnv allow   # one-time — activates devbox automatically on cd
-task setup     # installs npm deps + pre-commit hooks
+task setup     # installs npm deps
 ```
 
 After this, every time you `cd` into the repo, devbox activates and puts the correct versions of Node, task, pre-commit, and trufflehog on your PATH.
@@ -32,7 +32,7 @@ After this, every time you `cd` into the repo, devbox activates and puts the cor
 Run `task --list` to see all tasks. Key ones:
 
 ```
-task setup          # Install deps + pre-commit hooks
+task setup          # Install npm deps
 task dev            # Start Electron dev server
 task lint           # Run ESLint
 task lint:fix       # Run ESLint with auto-fix
@@ -42,9 +42,21 @@ task package        # Package the app
 task make           # Build distributable
 ```
 
-## Pre-commit hooks
+## Pre-commit hooks (optional, encouraged)
 
-Hooks run automatically on `git commit`. They include:
+Pre-commit hooks catch lint errors, formatting issues, and secrets before they reach the repo. They're optional but encouraged — CI runs the same checks, so setting them up locally saves you a round-trip.
+
+### Setup
+
+Devbox already puts `pre-commit` and `trufflehog` on your PATH. To install the git hooks:
+
+```bash
+task pre-commit:install
+```
+
+That's it. Hooks now run automatically on every `git commit`.
+
+### What the hooks do
 
 - **ESLint** — lints and auto-fixes JS/TS files
 - **Prettier** — formats code on commit
@@ -53,7 +65,18 @@ Hooks run automatically on `git commit`. They include:
 - **check-json / check-yaml** — validates config files
 - **check-added-large-files** — prevents files over 1MB
 
-To run all hooks manually:
+### If a commit fails
+
+Most hooks auto-fix the files for you. Just re-stage and commit again:
+
+```bash
+git add -u
+git commit
+```
+
+### Run hooks manually
+
+To run all hooks against all files (not just staged ones):
 
 ```bash
 task pre-commit:run
@@ -61,5 +84,4 @@ task pre-commit:run
 
 ## Code style
 
-- ESLint and Prettier handle formatting — don't worry about it manually, pre-commit fixes it on commit
-- If your commit fails due to a hook, check the output — most hooks auto-fix and you just need to `git add` the fixed files and commit again
+- ESLint and Prettier handle formatting — pre-commit fixes it on commit, or run `task format` and `task lint:fix` manually

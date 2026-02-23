@@ -2,10 +2,9 @@ version: '3'
 
 tasks:
   setup:
-    desc: Bootstrap development environment (install deps + pre-commit hooks)
+    desc: Bootstrap development environment
     cmds:
       - npm install
-      - task: pre-commit:install
 
   dev:
     desc: Start development server
