@@ -6,6 +6,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   isStreaming?: boolean;
+  toolCalls?: string[];
 }
 
 type MessagesMap = Map<number, ChatMessage[]>;
@@ -13,6 +14,7 @@ type MessagesMap = Map<number, ChatMessage[]>;
 type Action =
   | { type: 'SEND'; slideIndex: number; userMessage: ChatMessage; assistantMessage: ChatMessage }
   | { type: 'APPEND_CHUNK'; slideIndex: number; assistantId: string; chunk: string }
+  | { type: 'TOOL_USE'; slideIndex: number; assistantId: string; toolName: string }
   | { type: 'FINALIZE'; slideIndex: number; assistantId: string }
   | { type: 'ERROR'; slideIndex: number; assistantId: string; error: string }
   | { type: 'CLEAR'; slideIndex: number };
@@ -32,6 +34,20 @@ function reducer(state: MessagesMap, action: Action): MessagesMap {
       next.set(
         action.slideIndex,
         msgs.map((m) => (m.id === action.assistantId ? { ...m, content: m.content + action.chunk } : m))
+      );
+      return next;
+    }
+    case 'TOOL_USE': {
+      const msgs = next.get(action.slideIndex);
+      if (!msgs) return state;
+      next.set(
+        action.slideIndex,
+        msgs.map((m) => {
+          if (m.id !== action.assistantId) return m;
+          const existing = m.toolCalls ?? [];
+          if (existing.includes(action.toolName)) return m;
+          return { ...m, toolCalls: [...existing, action.toolName] };
+        })
       );
       return next;
     }
@@ -74,9 +90,17 @@ export function useSlideChat(review: ReviewGuide, provider: Provider, model: Mod
       dispatch({ type: 'APPEND_CHUNK', slideIndex: current.slideIndex, assistantId: current.assistantId, chunk });
     };
 
+    const toolHandler = (toolName: string) => {
+      const current = streamingRef.current;
+      if (!current) return;
+      dispatch({ type: 'TOOL_USE', slideIndex: current.slideIndex, assistantId: current.assistantId, toolName });
+    };
+
     window.electronAPI.onChatProgress(handler);
+    window.electronAPI.onChatToolUse(toolHandler);
     return () => {
       window.electronAPI.offChatProgress();
+      window.electronAPI.offChatToolUse();
     };
   }, []);
 

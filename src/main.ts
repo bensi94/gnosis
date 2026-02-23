@@ -861,6 +861,7 @@ ipcMain.handle('send-slide-chat', async (_event, req: SendSlideChatRequest) => {
           _event.sender.send('chat-progress', { chunk });
         }
       },
+      onToolUse: (toolName) => _event.sender.send('chat-tool-use', { toolName }),
       mcpConfigPath,
       allowedTools,
     });

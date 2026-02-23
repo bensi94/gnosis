@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, MessageSquare } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/Markdown';
 import type { ChatMessage } from '@/lib/use-slide-chat';
@@ -76,6 +76,19 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className="flex justify-start">
       <div className="bg-muted rounded-lg px-3 py-2 max-w-[85%] text-sm">
+        {message.toolCalls && message.toolCalls.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {message.toolCalls.map((tool) => (
+              <span
+                key={tool}
+                className={`inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 text-primary px-2 py-0.5 text-xs ${message.isStreaming ? 'animate-pulse' : ''}`}
+              >
+                <Globe className="h-3 w-3" />
+                {tool}
+              </span>
+            ))}
+          </div>
+        )}
         {message.content ? (
           <Markdown className="chat-response">{message.content}</Markdown>
         ) : message.isStreaming ? (
