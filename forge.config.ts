@@ -17,8 +17,8 @@ const config: ForgeConfig = {
       ? {
           osxSign: {
             optionsForFile: () => ({
-              entitlements: path.resolve('entitlements.plist'),
-              entitlementsInherit: path.resolve('entitlements.child.plist'),
+              entitlements: path.resolve(__dirname, 'entitlements.plist'),
+              entitlementsInherit: path.resolve(__dirname, 'entitlements.child.plist'),
             }),
           },
           osxNotarize: {
