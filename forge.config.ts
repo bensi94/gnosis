@@ -7,11 +7,27 @@ import { PublisherGithub } from '@electron-forge/publisher-github';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import path from 'path';
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     executableName: 'gnosis',
+    ...(process.env.APPLE_TEAM_ID
+      ? {
+          osxSign: {
+            optionsForFile: () => ({
+              entitlements: path.resolve('entitlements.plist'),
+              entitlementsInherit: path.resolve('entitlements.child.plist'),
+            }),
+          },
+          osxNotarize: {
+            appleId: process.env.APPLE_ID ?? '',
+            appleIdPassword: process.env.APPLE_ID_PASSWORD ?? '',
+            teamId: process.env.APPLE_TEAM_ID,
+          },
+        }
+      : {}),
   },
   rebuildConfig: {},
   makers: [
