@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Notification, safeStorage, shell } from 'electron';
+import { app, autoUpdater, BrowserWindow, ipcMain, Notification, safeStorage, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -283,13 +283,41 @@ function startUpdateChecks() {
   updateInterval = setInterval(() => void runUpdateCheck(), 4 * 60 * 60 * 1_000);
 }
 
+// ── Auto-updater (Squirrel) ─────────────────────────────────────
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+  if (process.platform === 'linux') return;
+
+  const feedURL = `https://update.electronjs.org/oddur/gnosis/${process.platform}-${process.arch}/${app.getVersion()}`;
+  try {
+    autoUpdater.setFeedURL({ url: feedURL });
+  } catch (err) {
+    console.warn('[main] Failed to set autoUpdater feed URL:', err);
+  }
+
+  autoUpdater.on('update-downloaded', () => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('auto-update-downloaded');
+    }
+  });
+
+  autoUpdater.on('error', (err: Error) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('auto-update-error', err.message);
+    }
+  });
+}
+
 void app.whenReady().then(() => {
+  // Expose packaged state to preload via env var (before creating windows)
+  process.env.APP_IS_PACKAGED = app.isPackaged ? '1' : '0';
+
   // Mark any stale "generating" entries from a previous crash as failed
   cleanupStaleGeneratingEntries();
-
   applyBinaryOverrides(loadPreferences());
   createWindow();
   startUpdateChecks();
+  setupAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -452,6 +480,14 @@ const WEB_ONLY_TOOLS = ['WebFetch', 'WebSearch'];
 
 ipcMain.handle('dismiss-update', (_event, version: string) => {
   dismissedUpdateVersion = version;
+});
+
+ipcMain.handle('apply-update', () => {
+  autoUpdater.checkForUpdates();
+});
+
+ipcMain.handle('restart-to-update', () => {
+  autoUpdater.quitAndInstall();
 });
 
 ipcMain.handle('open-external', (_event, url: string) => {

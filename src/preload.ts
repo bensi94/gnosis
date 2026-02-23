@@ -102,5 +102,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   detectBinaryPath: (name: string): Promise<string> => ipcRenderer.invoke('detect-binary-path', name),
   checkCliInstalled: (provider: string): Promise<{ installed: boolean; resolvedPath: string }> =>
     ipcRenderer.invoke('check-cli-installed', provider),
+  applyUpdate: (): Promise<void> => ipcRenderer.invoke('apply-update'),
+  restartToUpdate: (): Promise<void> => ipcRenderer.invoke('restart-to-update'),
+  onUpdateDownloaded: (callback: () => void): void => {
+    ipcRenderer.on('auto-update-downloaded', () => callback());
+  },
+  offUpdateDownloaded: (): void => {
+    ipcRenderer.removeAllListeners('auto-update-downloaded');
+  },
+  onUpdateError: (callback: (message: string) => void): void => {
+    ipcRenderer.on('auto-update-error', (_event, message: string) => callback(message));
+  },
+  offUpdateError: (): void => {
+    ipcRenderer.removeAllListeners('auto-update-error');
+  },
   platform: process.platform,
+  isPackaged: process.env.APP_IS_PACKAGED === '1',
 });
