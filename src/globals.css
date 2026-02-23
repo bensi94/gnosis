@@ -283,8 +283,12 @@
   animation: check-highlight-fade 1.5s ease-out forwards;
 }
 @keyframes check-highlight-fade {
-  from { opacity: 1; }
-  to   { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* ─── Freshness banner ────────────────────────────────────────── */
