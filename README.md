@@ -77,18 +77,22 @@ Past reviews are saved locally and grouped by PR on the home screen — click an
 <img width="1512" height="1012" alt="image" src="https://github.com/user-attachments/assets/f5e0f4aa-bf81-4817-a68d-a478f9030778" />
 <img width="1512" height="1012" alt="image" src="https://github.com/user-attachments/assets/f83e2731-9e62-4072-9a84-ff1c6ca54c6c" />
 
-
 ## Development
+
+Prerequisites: [devbox](https://www.jetify.com/docs/devbox/installing_devbox/) and [direnv](https://direnv.net/docs/installation.html).
 
 ```bash
 git clone https://github.com/oddur/gnosis.git
 cd gnosis
-npm install
-npm start
+direnv allow   # activates devbox automatically on cd
+task setup     # installs npm deps + pre-commit hooks
+task dev       # starts the Electron dev server
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide.
 
 ## Build
 
 ```bash
-npm run make      # produces a distributable in out/
+task make      # produces a distributable in out/
 ```
