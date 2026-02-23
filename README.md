@@ -17,6 +17,10 @@ It runs locally and uses the [Claude Code CLI](https://claude.ai/code) or [Gemin
 - **Extended thinking** — enable deeper reasoning for Claude models (slower, more thorough)
 - **Custom instructions** — steer the review with free-text prompts (e.g. _focus on security_, _explain the auth flow_)
 - **Inline review comments** — add comments on specific diff lines and submit directly to GitHub as an approval, request for changes, or comment
+- **Split diff view** — toggle between unified and side-by-side diff layout; preference persists across sessions
+- **Slide chat** — ask follow-up questions about any slide in an inline resizable side panel, with tool call indicators shown as pills during streaming
+- **Web research** — optionally allow the AI to search the web and fetch pages during review generation and slide chat (Claude only)
+- **MCP tool support** — optionally allow the AI to query GitHub context (issues, PRs, file contents) during reviews via MCP (Claude only)
 - **Signal boost** — filters out trivial changes (whitespace, import reordering, boilerplate) and focuses on design decisions, complexity, and API surface changes
 - **Smart imports** — uses a fast model to detect local file imports across all languages (C#, Rust, Python, Go, etc.), giving reviewers context beyond just JS/TS `import` statements
 - **PR browser** — browse your open PRs and review requests instead of pasting URLs
@@ -24,9 +28,11 @@ It runs locally and uses the [Claude Code CLI](https://claude.ai/code) or [Gemin
 - **Review history** — past reviews are saved locally and grouped by PR on the home screen
 - **Mermaid diagrams** — slides can include architecture and flow diagrams, viewable in fullscreen
 - **Risk assessment** — each review is rated low/medium/high risk based on what changed
+- **Clickable file paths** — diff header file paths link directly to the file on GitHub
 - **Configurable CLI paths** — if the CLI isn't auto-detected (e.g. Finder/Dock launch), set the path manually in Settings
 - **Code appearance** — pick your code font and syntax theme in Settings
 - **Update notifications** — in-app banner when a new release is available
+- **Cross-platform** — builds for macOS, Windows, and Linux (deb/rpm)
 
 ## Requirements
 
