@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Brain, GitPullRequest, FileCode, Loader } from 'lucide-react';
+import { Brain, GitPullRequest, FileCode, Loader, Globe } from 'lucide-react';
 
 interface Props {
   message: string;
   streamingText?: string;
+  activeToolCall?: string | null;
 }
 
 const phases = [
@@ -13,7 +14,7 @@ const phases = [
   { icon: Loader, text: 'Generating review…' },
 ];
 
-export function LoadingScreen({ message, streamingText }: Props) {
+export function LoadingScreen({ message, streamingText, activeToolCall }: Props) {
   const preRef = useRef<HTMLPreElement>(null);
   const [phaseIndex, setPhaseIndex] = useState(0);
 
@@ -76,6 +77,13 @@ export function LoadingScreen({ message, streamingText }: Props) {
             />
           ))}
         </div>
+
+        {activeToolCall && (
+          <div className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary animate-pulse">
+            <Globe className="h-3 w-3" />
+            <span>{activeToolCall}</span>
+          </div>
+        )}
 
         <p className="text-xs text-muted-foreground/60">{message}</p>
 

@@ -25,6 +25,8 @@ declare global {
       deleteAllReviews: () => Promise<void>;
       onReviewProgress: (callback: (chunk: string, isThinking: boolean) => void) => void;
       offReviewProgress: () => void;
+      onReviewToolUse: (callback: (toolName: string) => void) => void;
+      offReviewToolUse: () => void;
       sendSlideChat: (req: SendSlideChatRequest) => Promise<string>;
       onChatProgress: (callback: (chunk: string) => void) => void;
       offChatProgress: () => void;

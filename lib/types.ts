@@ -49,6 +49,11 @@ export interface AISlide {
   mermaidDiagram?: string | null;
 }
 
+export interface WebSource {
+  url: string;
+  title: string;
+}
+
 export interface AIReviewGuide {
   prTitle: string;
   prDescription: string;
@@ -60,6 +65,7 @@ export interface AIReviewGuide {
   totalFilesChanged: number;
   totalLinesChanged: number;
   slides: AISlide[];
+  webSources?: WebSource[];
 }
 
 export interface ReviewGuide {
@@ -76,6 +82,7 @@ export interface ReviewGuide {
   generationDurationMs?: number;
   slides: Slide[];
   headSha?: string;
+  webSources?: WebSource[];
 }
 
 export interface PrStatus {
@@ -149,6 +156,7 @@ export interface Preferences {
   smartImports: boolean;
   reviewSuggestions: boolean;
   enableTools: boolean;
+  enableWebResearch: boolean;
   codeTheme: string;
   codeFont: string;
   claudePath: string;
@@ -180,6 +188,7 @@ export interface GenerateReviewRequest {
   signalBoost?: boolean;
   smartImports?: boolean;
   reviewSuggestions?: boolean;
+  webResearch?: boolean;
 }
 
 export interface GenerateReviewResponse {

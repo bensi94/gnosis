@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   offReviewProgress: (): void => {
     ipcRenderer.removeAllListeners('review-progress');
   },
+  onReviewToolUse: (callback: (toolName: string) => void): void => {
+    ipcRenderer.on('review-tool-use', (_event, { toolName }: { toolName: string }) => callback(toolName));
+  },
+  offReviewToolUse: (): void => {
+    ipcRenderer.removeAllListeners('review-tool-use');
+  },
   sendSlideChat: (req: SendSlideChatRequest): Promise<string> => ipcRenderer.invoke('send-slide-chat', req),
   onChatProgress: (callback: (chunk: string) => void): void => {
     ipcRenderer.on('chat-progress', (_event, { chunk }: { chunk: string }) => callback(chunk));

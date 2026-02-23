@@ -106,6 +106,17 @@ const CONCISE_SUFFIX = `
 
 IMPORTANT: Be concise. Keep narrative and reviewFocus under 2 sentences each. Omit contextSnippets entirely (use empty arrays). Limit diffHunkIds to the 5 most important hunk IDs per slide. Return only raw JSON starting with { and ending with }.`;
 
+const WEB_RESEARCH_DIRECTIVE = `
+WEB RESEARCH MODE — ACTIVE
+You have access to web search and fetch tools. Before producing the review guide:
+1. Identify frameworks, libraries, and APIs referenced in the code
+2. Search for their official documentation, migration guides, or changelogs when relevant
+3. Look up best practices or known issues for patterns used in the PR
+4. Use this research to enrich your narratives with accurate technical context
+
+Include every URL you consulted in the "webSources" array. Each entry needs "url" and "title".
+`;
+
 const SIGNAL_BOOST_DIRECTIVE = `
 SIGNAL BOOST MODE — ACTIVE
 You must apply these rules on top of all other guidelines:
@@ -150,26 +161,31 @@ export async function generateReviewGuide(
   signalBoost: boolean = false,
   mcpConfigPath?: string,
   allowedTools?: string[],
-  reviewSuggestions: boolean = true
+  reviewSuggestions: boolean = true,
+  webResearch: boolean = false,
+  onToolUse?: (toolName: string) => void
 ): Promise<AIReviewGuide> {
   const provider = getProvider(providerName);
 
   async function attempt(extraInstruction: string = ''): Promise<AIReviewGuide> {
     const customInstructions = instructions?.trim();
+    const webSourcesSchema = webResearch ? `,\n  "webSources": [{ "url": string, "title": string }, ...]` : '';
     const userMessage = customInstructions
       ? contextPackage +
-        USER_SUFFIX +
+        USER_SUFFIX.replace('\n}', `${webSourcesSchema}\n}`) +
         extraInstruction +
         `\n\n<reviewer_instructions>\nThe reviewer has provided custom instructions that MUST take priority over default style guidelines.\n${customInstructions}\n</reviewer_instructions>`
-      : contextPackage + USER_SUFFIX + extraInstruction;
+      : contextPackage + USER_SUFFIX.replace('\n}', `${webSourcesSchema}\n}`) + extraInstruction;
 
     const reviewSuggestionsDirective = reviewSuggestions
       ? ''
       : `\nREVIEW SUGGESTIONS DISABLED: The reviewer has turned off review suggestions. Set "reviewFocus" to null for every slide. Do not generate any review focus content.\n`;
 
+    const webResearchDirective = webResearch ? WEB_RESEARCH_DIRECTIVE : '';
+
     const baseSystem = signalBoost
-      ? `${SIGNAL_BOOST_DIRECTIVE}\n${SYSTEM_PROMPT}${reviewSuggestionsDirective}`
-      : `${SYSTEM_PROMPT}${reviewSuggestionsDirective}`;
+      ? `${SIGNAL_BOOST_DIRECTIVE}\n${webResearchDirective}${SYSTEM_PROMPT}${reviewSuggestionsDirective}`
+      : `${webResearchDirective}${SYSTEM_PROMPT}${reviewSuggestionsDirective}`;
 
     const system = customInstructions
       ? `${baseSystem}\n\nIMPORTANT — CUSTOM REVIEWER INSTRUCTIONS:\nThe reviewer has provided the following instructions. These take precedence over the default writing style and tone guidelines above. Adapt your narrative, reviewFocus, summary, and all prose fields accordingly.\n\n<instructions>\n${customInstructions}\n</instructions>`
@@ -188,6 +204,7 @@ export async function generateReviewGuide(
       model,
       thinking,
       onChunk,
+      onToolUse,
       mcpConfigPath,
       allowedTools,
     });
