@@ -96,6 +96,8 @@ function InteractiveHunk({
             <span key={idx}>
               <span
                 className={`line ${diffClass} interactive-line`}
+                data-file-path={filePath}
+                data-line-number={line.info.lineNumber}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

@@ -1,3 +1,4 @@
+import { useRef, useCallback } from 'react';
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { Eye, MessageCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,7 @@ import { Markdown } from '@/components/Markdown';
 import { MermaidDiagram } from '@/components/MermaidDiagram';
 import { slideTypeConfig } from '@/lib/constants';
 import type { CommentCallbacks } from '@/components/shared-diff-utils';
-import type { Slide, DiffHunk, PendingReviewComment, Preferences } from '@/lib/types';
+import type { Slide, DiffHunk, PendingReviewComment, Preferences, ReviewCheck } from '@/lib/types';
 
 interface Props {
   slide: Slide;
@@ -81,6 +82,23 @@ export function SlideView({
   const typeConfig = slideTypeConfig[slide.slideType];
   const Icon = typeConfig.icon;
   const groupedHunks = groupHunksByFile(slide.diffHunks);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+
+  const handleCheckClick = useCallback((check: ReviewCheck) => {
+    if (!check.filePath || !check.startLine) return;
+    const container = rightPanelRef.current;
+    if (!container) return;
+
+    const selector = `[data-file-path="${CSS.escape(check.filePath)}"][data-line-number="${check.startLine}"]`;
+    const target = container.querySelector(selector);
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.remove('check-highlight');
+    // Force reflow to restart animation if clicking the same item again
+    void (target as HTMLElement).offsetWidth;
+    target.classList.add('check-highlight');
+  }, []);
 
   return (
     <PanelGroup orientation="horizontal" className="flex flex-1 overflow-hidden">
@@ -99,15 +117,30 @@ export function SlideView({
           <Markdown className="text-sm text-muted-foreground leading-relaxed">{slide.narrative}</Markdown>
 
           {/* Review focus */}
-          {slide.reviewFocus && (
-            <div className="review-focus-callout rounded-lg border-l-2 border-l-primary bg-primary/[0.06] px-4 py-3">
-              <p className="text-xs uppercase tracking-wider text-primary/70 flex items-center gap-1.5 mb-2">
-                <Eye className="h-3 w-3" />
-                What to check
-              </p>
+          <div className="review-focus-callout rounded-lg border-l-2 border-l-primary bg-primary/[0.06] px-4 py-3">
+            <p className="text-xs uppercase tracking-wider text-primary/70 flex items-center gap-1.5 mb-2">
+              <Eye className="h-3 w-3" />
+              What to check
+            </p>
+            {slide.reviewChecks && slide.reviewChecks.length > 0 ? (
+              <ul className="text-sm review-focus-content" style={{ listStyle: 'none', paddingLeft: 0 }}>
+                {slide.reviewChecks.map((check, i) => {
+                  const isClickable = !!(check.filePath && check.startLine != null && check.startLine > 0);
+                  return (
+                    <li
+                      key={i}
+                      className={isClickable ? 'cursor-pointer hover:bg-muted/50 rounded-sm transition-colors' : ''}
+                      onClick={isClickable ? () => handleCheckClick(check) : undefined}
+                    >
+                      {check.text}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
               <Markdown className="text-sm review-focus-content">{slide.reviewFocus}</Markdown>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Affected files */}
           {slide.affectedFiles.length > 0 && (
@@ -155,7 +188,7 @@ export function SlideView({
 
       {/* Right panel — diagram + diffs */}
       <Panel defaultSize={60} minSize={30} className="overflow-y-auto min-h-0">
-        <div className="p-6 flex flex-col gap-4">
+        <div ref={rightPanelRef} className="p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             {slide.mermaidDiagram && <p className="text-xs uppercase tracking-wider text-muted-foreground">Diagram</p>}
             <div className="ml-auto">

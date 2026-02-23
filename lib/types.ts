@@ -20,6 +20,12 @@ export interface DiffHunk {
   renderedHtml: string;
 }
 
+export interface ReviewCheck {
+  text: string;
+  filePath?: string;
+  startLine?: number;
+}
+
 export interface Slide {
   id: string;
   slideNumber: number;
@@ -32,6 +38,7 @@ export interface Slide {
   affectedFiles: string[];
   dependsOn: string[];
   mermaidDiagram?: string | null;
+  reviewChecks?: ReviewCheck[];
 }
 
 // Intermediate types for raw AI response (before hunk resolution)
@@ -47,6 +54,7 @@ export interface AISlide {
   affectedFiles: string[];
   dependsOn: string[];
   mermaidDiagram?: string | null;
+  reviewChecks?: ReviewCheck[];
 }
 
 export interface WebSource {
