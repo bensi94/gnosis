@@ -42,7 +42,6 @@ It runs locally and uses the [Claude Code CLI](https://claude.ai/code) or [Gemin
 - **At least one** of the following CLIs installed and authenticated:
   - [Claude Code CLI](https://claude.ai/code) — authenticate with `claude auth`
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
-- Node.js 20+
 
 ## Install
 
