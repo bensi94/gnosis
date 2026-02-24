@@ -1,4 +1,4 @@
-import { app, autoUpdater, BrowserWindow, ipcMain, Notification, safeStorage, shell } from 'electron';
+import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Notification, safeStorage, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -282,6 +282,8 @@ function setupLogging() {
 
 // ── Window ───────────────────────────────────────────────────────
 
+let quitConfirmed = false;
+
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1400,
@@ -300,6 +302,28 @@ function createWindow() {
     void shell.openExternal(url);
     return { action: 'deny' };
   });
+
+  // On non-macOS, closing the window quits the app — confirm if a review is in progress.
+  // On macOS, closing the window leaves the app running so reviews complete in the background.
+  if (process.platform !== 'darwin') {
+    mainWindow.on('close', (event) => {
+      if (quitConfirmed || activeGenerations.size === 0) return;
+      event.preventDefault();
+      const count = activeGenerations.size;
+      const response = dialog.showMessageBoxSync(mainWindow, {
+        type: 'question',
+        buttons: ['Cancel', 'Quit Anyway'],
+        defaultId: 0,
+        cancelId: 0,
+        message: `Quit while ${count === 1 ? 'a review is' : `${count} reviews are`} generating?`,
+        detail: `${count === 1 ? 'It' : 'They'} will be cancelled if you quit now.`,
+      });
+      if (response === 1) {
+        quitConfirmed = true;
+        mainWindow.destroy();
+      }
+    });
+  }
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -388,7 +412,25 @@ void app.whenReady().then(() => {
   });
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (!quitConfirmed && activeGenerations.size > 0) {
+    event.preventDefault();
+    const count = activeGenerations.size;
+    const win = BrowserWindow.getAllWindows()[0];
+    const response = dialog.showMessageBoxSync(win, {
+      type: 'question',
+      buttons: ['Cancel', 'Quit Anyway'],
+      defaultId: 0,
+      cancelId: 0,
+      message: `Quit while ${count === 1 ? 'a review is' : `${count} reviews are`} generating?`,
+      detail: `${count === 1 ? 'It' : 'They'} will be cancelled if you quit now.`,
+    });
+    if (response === 1) {
+      quitConfirmed = true;
+      app.quit();
+    }
+    return;
+  }
   // Mark any in-flight generations as failed
   for (const [id] of activeGenerations) {
     updateHistoryEntry(id, { status: 'failed', error: 'App quit during generation' });
