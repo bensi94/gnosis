@@ -98,8 +98,12 @@ export const claudeProvider: LLMProvider = {
       env: makeClaudeEnv(thinking),
       installHint: INSTALL_HINT,
       handleExitError: (stderr: string) => {
+        const stderrTrimmed = stderr.trim();
+        if (streamError && stderrTrimmed && !stderrTrimmed.includes(streamError)) {
+          return new Error(`${streamError} — ${stderrTrimmed.slice(0, 200)}`);
+        }
         if (streamError) return new Error(streamError);
-        if (stderr) return new Error(stderr.slice(0, 300));
+        if (stderrTrimmed) return new Error(stderrTrimmed.slice(0, 300));
         return undefined;
       },
     });
