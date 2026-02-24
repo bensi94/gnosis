@@ -14,6 +14,7 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     executableName: 'gnosis',
+    icon: path.resolve(__dirname, 'Icon/macos/AppIcon'),
     ...(process.env.APPLE_TEAM_ID
       ? {
           osxSign: {
@@ -32,7 +33,11 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({ authors: 'Oddur Magnusson' }),
+    new MakerSquirrel({
+      authors: 'Oddur Magnusson',
+      iconUrl: 'https://raw.githubusercontent.com/oddur/gnosis/main/Icon/web/favicon.ico',
+      setupIcon: path.resolve(__dirname, 'Icon/web/favicon.ico'),
+    }),
     new MakerZIP({}, ['darwin']),
     new MakerDMG({ name: 'Gnosis' }),
     new MakerDeb({}),
