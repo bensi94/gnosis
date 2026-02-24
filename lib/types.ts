@@ -138,9 +138,18 @@ export interface ReviewHistoryEntry {
   prUrl: string;
   author: string;
   riskLevel: 'low' | 'medium' | 'high';
+  status?: 'generating' | 'completed' | 'failed'; // undefined defaults to 'completed' (backward compat)
+  error?: string;
   model?: ModelId;
   generationDurationMs?: number;
   savedAt: string; // ISO date string
+}
+
+export interface StartReviewResult {
+  reviewId: string;
+  prTitle: string;
+  prUrl: string;
+  author: string;
 }
 
 export type Provider = 'claude' | 'gemini';

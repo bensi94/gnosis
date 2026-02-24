@@ -6,6 +6,7 @@ import type {
   ReviewGuide,
   ReviewHistoryEntry,
   SendSlideChatRequest,
+  StartReviewResult,
   SubmitReviewRequest,
   FreshnessResult,
   UpdateInfo,
@@ -14,7 +15,7 @@ import type {
 declare global {
   interface Window {
     electronAPI: {
-      generateReview: (req: GenerateReviewRequest) => Promise<ReviewGuide>;
+      startReview: (req: GenerateReviewRequest) => Promise<StartReviewResult>;
       getConfig: () => Promise<{ githubToken: string | null }>;
       startOAuth: () => Promise<void>;
       getAuthState: () => Promise<{ authenticated: boolean; login: string | null }>;
@@ -23,10 +24,18 @@ declare global {
       loadReview: (id: string) => Promise<ReviewGuide>;
       deleteReview: (id: string) => Promise<void>;
       deleteAllReviews: () => Promise<void>;
-      onReviewProgress: (callback: (chunk: string, isThinking: boolean) => void) => void;
+      onReviewProgress: (callback: (reviewId: string, chunk: string, isThinking: boolean) => void) => void;
       offReviewProgress: () => void;
-      onReviewToolUse: (callback: (toolName: string) => void) => void;
+      onReviewToolUse: (callback: (reviewId: string, toolName: string) => void) => void;
       offReviewToolUse: () => void;
+      onReviewPhase: (callback: (reviewId: string, phase: string) => void) => void;
+      offReviewPhase: () => void;
+      onReviewCompleted: (callback: (reviewId: string) => void) => void;
+      offReviewCompleted: () => void;
+      onReviewFailed: (callback: (reviewId: string, error: string) => void) => void;
+      offReviewFailed: () => void;
+      onReviewNavigate: (callback: (reviewId: string) => void) => void;
+      offReviewNavigate: () => void;
       sendSlideChat: (req: SendSlideChatRequest) => Promise<string>;
       onChatProgress: (callback: (chunk: string) => void) => void;
       offChatProgress: () => void;

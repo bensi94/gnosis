@@ -7,13 +7,14 @@ import type {
   ReviewGuide,
   ReviewHistoryEntry,
   SendSlideChatRequest,
+  StartReviewResult,
   SubmitReviewRequest,
   FreshnessResult,
   UpdateInfo,
 } from '../lib/types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  generateReview: (req: GenerateReviewRequest): Promise<ReviewGuide> => ipcRenderer.invoke('generate-review', req),
+  startReview: (req: GenerateReviewRequest): Promise<StartReviewResult> => ipcRenderer.invoke('start-review', req),
   getConfig: (): Promise<{ githubToken: string | null }> => ipcRenderer.invoke('get-config'),
   startOAuth: (): Promise<void> => ipcRenderer.invoke('start-oauth'),
   getAuthState: (): Promise<{ authenticated: boolean; login: string | null }> => ipcRenderer.invoke('get-auth-state'),
@@ -22,19 +23,51 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadReview: (id: string): Promise<ReviewGuide> => ipcRenderer.invoke('load-review', id),
   deleteReview: (id: string): Promise<void> => ipcRenderer.invoke('delete-review', id),
   deleteAllReviews: (): Promise<void> => ipcRenderer.invoke('delete-all-reviews'),
-  onReviewProgress: (callback: (chunk: string, isThinking: boolean) => void): void => {
-    ipcRenderer.on('review-progress', (_event, { chunk, isThinking }: { chunk: string; isThinking: boolean }) =>
-      callback(chunk, isThinking)
+  onReviewProgress: (callback: (reviewId: string, chunk: string, isThinking: boolean) => void): void => {
+    ipcRenderer.on(
+      'review-progress',
+      (_event, { reviewId, chunk, isThinking }: { reviewId: string; chunk: string; isThinking: boolean }) =>
+        callback(reviewId, chunk, isThinking)
     );
   },
   offReviewProgress: (): void => {
     ipcRenderer.removeAllListeners('review-progress');
   },
-  onReviewToolUse: (callback: (toolName: string) => void): void => {
-    ipcRenderer.on('review-tool-use', (_event, { toolName }: { toolName: string }) => callback(toolName));
+  onReviewToolUse: (callback: (reviewId: string, toolName: string) => void): void => {
+    ipcRenderer.on('review-tool-use', (_event, { reviewId, toolName }: { reviewId: string; toolName: string }) =>
+      callback(reviewId, toolName)
+    );
   },
   offReviewToolUse: (): void => {
     ipcRenderer.removeAllListeners('review-tool-use');
+  },
+  onReviewPhase: (callback: (reviewId: string, phase: string) => void): void => {
+    ipcRenderer.on('review-phase', (_event, { reviewId, phase }: { reviewId: string; phase: string }) =>
+      callback(reviewId, phase)
+    );
+  },
+  offReviewPhase: (): void => {
+    ipcRenderer.removeAllListeners('review-phase');
+  },
+  onReviewCompleted: (callback: (reviewId: string) => void): void => {
+    ipcRenderer.on('review-completed', (_event, { reviewId }: { reviewId: string }) => callback(reviewId));
+  },
+  offReviewCompleted: (): void => {
+    ipcRenderer.removeAllListeners('review-completed');
+  },
+  onReviewFailed: (callback: (reviewId: string, error: string) => void): void => {
+    ipcRenderer.on('review-failed', (_event, { reviewId, error }: { reviewId: string; error: string }) =>
+      callback(reviewId, error)
+    );
+  },
+  offReviewFailed: (): void => {
+    ipcRenderer.removeAllListeners('review-failed');
+  },
+  onReviewNavigate: (callback: (reviewId: string) => void): void => {
+    ipcRenderer.on('review-navigate', (_event, { reviewId }: { reviewId: string }) => callback(reviewId));
+  },
+  offReviewNavigate: (): void => {
+    ipcRenderer.removeAllListeners('review-navigate');
   },
   sendSlideChat: (req: SendSlideChatRequest): Promise<string> => ipcRenderer.invoke('send-slide-chat', req),
   onChatProgress: (callback: (chunk: string) => void): void => {
