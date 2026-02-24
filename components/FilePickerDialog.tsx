@@ -124,7 +124,7 @@ export function FilePickerDialog({ open, onOpenChange, prUrl, onConfirm }: Props
       <DialogContent className="bg-card sm:max-w-2xl max-h-[80vh] flex flex-col gap-4">
         <DialogHeader>
           <DialogTitle>Select files to include</DialogTitle>
-          <DialogDescription>Choose which PR files to send to the AI</DialogDescription>
+          <DialogDescription>Choose which files to include in the review</DialogDescription>
         </DialogHeader>
 
         {loading && (

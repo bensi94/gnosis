@@ -568,6 +568,18 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                     </div>
                   </div>
 
+                  <ToggleSwitch
+                    id="include-all-files"
+                    label="Include all files"
+                    description={
+                      includeAllFiles
+                        ? 'All changed files included in the review'
+                        : 'You will choose which files to include'
+                    }
+                    checked={includeAllFiles}
+                    onToggle={() => setIncludeAllFiles((v) => !v)}
+                  />
+
                   {provider === 'claude' && (
                     <ToggleSwitch
                       id="thinking"
@@ -613,16 +625,6 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                       onToggle={() => setWebResearch((w) => !w)}
                     />
                   )}
-
-                  <ToggleSwitch
-                    id="include-all-files"
-                    label="Include all files"
-                    description={
-                      includeAllFiles ? 'All changed files sent to the AI' : 'You will choose which files to include'
-                    }
-                    checked={includeAllFiles}
-                    onToggle={() => setIncludeAllFiles((v) => !v)}
-                  />
 
                   {error && (
                     <Alert variant="destructive">
