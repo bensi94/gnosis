@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Loader2,
   CircleX,
+  FileText,
 } from 'lucide-react';
 import { GitHubIcon } from '../../lib/constants';
 import { Button } from '../../components/ui/button';
@@ -630,7 +631,20 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                                 {risk.label}
                               </Badge>
                             )}
-                            <div className="shrink-0 w-7 flex items-center justify-center">
+                            <div className="shrink-0 flex items-center gap-0.5">
+                              {!hasMultiple && latestStatus === 'failed' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void window.electronAPI.openReviewPrompt(group.latestReview.id);
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity px-1"
+                                  aria-label="View prompt"
+                                  title="Open the prompt sent to the AI"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                               {!hasMultiple && latestStatus !== 'generating' && (
                                 <button
                                   onClick={(e) => handleDeleteFromHistory(e, group.latestReview.id)}
@@ -691,6 +705,19 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                                         >
                                           {reviewRisk.label}
                                         </Badge>
+                                      )}
+                                      {reviewStatus === 'failed' && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void window.electronAPI.openReviewPrompt(review.id);
+                                          }}
+                                          className="shrink-0 opacity-0 group-hover/review:opacity-100 text-muted-foreground hover:text-foreground transition-opacity px-1"
+                                          aria-label="View prompt"
+                                          title="Open the prompt sent to the AI"
+                                        >
+                                          <FileText className="h-3.5 w-3.5" />
+                                        </button>
                                       )}
                                       {reviewStatus !== 'generating' && (
                                         <button

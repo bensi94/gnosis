@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { FolderOpen } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { CODE_THEMES, CODE_FONTS } from '@/lib/constants';
 import type { CodeTheme, CodeFont } from '@/lib/constants';
 
@@ -158,6 +160,18 @@ export function SettingsDialog({ open, onOpenChange, onThemeChange }: Props) {
               className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
             <p className="text-xs text-muted-foreground">Leave empty to auto-detect</p>
+          </div>
+
+          <div className="border-t border-border pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => void window.electronAPI.openLogsDirectory()}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              Open logs
+            </Button>
           </div>
         </div>
       </DialogContent>
