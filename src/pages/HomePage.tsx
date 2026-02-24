@@ -21,6 +21,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { PRPickerDialog } from '../../components/PRPickerDialog';
+import { FilePickerDialog } from '../../components/FilePickerDialog';
 import { SettingsDialog } from '../../components/SettingsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { riskConfig } from '../../lib/constants';
@@ -129,7 +130,9 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [history, setHistory] = useState<ReviewHistoryEntry[]>([]);
+  const [includeAllFiles, setIncludeAllFiles] = useState(true);
   const [prPickerOpen, setPrPickerOpen] = useState(false);
+  const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cliNotFound, setCliNotFound] = useState<{ provider: string } | null>(null);
   const [expandedPRs, setExpandedPRs] = useState<Set<string>>(new Set());
@@ -244,6 +247,31 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     setAuthStatus('unauthenticated');
   }
 
+  async function doStartReview(excludedFiles: string[]) {
+    setSubmitting(true);
+    try {
+      await window.electronAPI.startReview({
+        prUrl: prUrl.trim(),
+        provider,
+        model,
+        instructions: instructions.trim() || undefined,
+        thinking,
+        signalBoost,
+        smartImports,
+        reviewSuggestions,
+        webResearch,
+        excludedFiles: excludedFiles.length > 0 ? excludedFiles : undefined,
+      });
+      const updated = await window.electronAPI.listReviews();
+      setHistory(updated);
+      setPrUrl('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start review.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     if (!prUrl.trim() || submitting) return;
@@ -257,29 +285,12 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
       return;
     }
 
-    setSubmitting(true);
-
-    try {
-      await window.electronAPI.startReview({
-        prUrl: prUrl.trim(),
-        provider,
-        model,
-        instructions: instructions.trim() || undefined,
-        thinking,
-        signalBoost,
-        smartImports,
-        reviewSuggestions,
-        webResearch,
-      });
-      // Refresh history to show the new "generating" entry
-      const updated = await window.electronAPI.listReviews();
-      setHistory(updated);
-      setPrUrl('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start review.');
-    } finally {
-      setSubmitting(false);
+    if (!includeAllFiles) {
+      setFilePickerOpen(true);
+      return;
     }
+
+    void doStartReview([]);
   }
 
   async function handleLoadFromHistory(id: string) {
@@ -403,6 +414,15 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                   </div>
                   <PRPickerDialog open={prPickerOpen} onOpenChange={setPrPickerOpen} onSelect={setPrUrl} />
                   <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+                  <FilePickerDialog
+                    open={filePickerOpen}
+                    onOpenChange={setFilePickerOpen}
+                    prUrl={prUrl.trim()}
+                    onConfirm={(excluded) => {
+                      setFilePickerOpen(false);
+                      void doStartReview(excluded);
+                    }}
+                  />
 
                   <Dialog open={cliNotFound !== null} onOpenChange={() => setCliNotFound(null)}>
                     <DialogContent className="bg-card sm:max-w-md">
@@ -593,6 +613,16 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                       onToggle={() => setWebResearch((w) => !w)}
                     />
                   )}
+
+                  <ToggleSwitch
+                    id="include-all-files"
+                    label="Include all files"
+                    description={
+                      includeAllFiles ? 'All changed files sent to the AI' : 'You will choose which files to include'
+                    }
+                    checked={includeAllFiles}
+                    onToggle={() => setIncludeAllFiles((v) => !v)}
+                  />
 
                   {error && (
                     <Alert variant="destructive">

@@ -29,6 +29,7 @@ import { buildIndexedHunks, expandFullDiff, formatHunkIndexForPrompt, sortDiffHu
 import { classifyFiles, filterDiff, buildExcludedFilesSummary } from '../lib/file-filter';
 import { writeMcpConfig, cleanupMcpConfig } from '../lib/mcp-config';
 import type {
+  ChangedFile,
   DiffHunk,
   GenerateReviewRequest,
   ModelId,
@@ -796,6 +797,13 @@ ipcMain.handle('get-pr-status', async (_event, prUrl: string): Promise<PrStatus>
   };
 });
 
+ipcMain.handle('get-pr-files', async (_event, prUrl: string): Promise<ChangedFile[]> => {
+  const token = getResolvedToken();
+  const octokit = new Octokit({ auth: token ?? undefined });
+  const { owner, repo, pullNumber } = parsePrUrl(prUrl);
+  return getChangedFiles(octokit, owner, repo, pullNumber);
+});
+
 // ── Background review generation ────────────────────────────────
 
 async function runBackgroundGeneration(
@@ -813,10 +821,16 @@ async function runBackgroundGeneration(
 
     broadcastToAllWindows('review-phase', { reviewId, phase: 'Fetching PR data' });
 
-    const [diff, changedFiles] = await Promise.all([
+    const [diff, allChangedFiles] = await Promise.all([
       getPrDiff(octokit, owner, repo, pullNumber),
       getChangedFiles(octokit, owner, repo, pullNumber),
     ]);
+
+    // Apply user exclusions before any other processing
+    const userExcludedSet = new Set(request.excludedFiles ?? []);
+    const changedFiles =
+      userExcludedSet.size > 0 ? allChangedFiles.filter((f) => !userExcludedSet.has(f.filename)) : allChangedFiles;
+    const userFilteredDiff = userExcludedSet.size > 0 ? filterDiff(diff, userExcludedSet) : diff;
 
     if (changedFiles.length === 0) {
       throw new Error('PR has no changed files');
@@ -825,7 +839,7 @@ async function runBackgroundGeneration(
     // Filter out generated/lock files early to avoid token budget blowup
     const { normalFiles, generatedFiles } = classifyFiles(changedFiles);
     const generatedFilenames = new Set(generatedFiles.map((f) => f.filename));
-    const filteredDiff = filterDiff(diff, generatedFilenames);
+    const filteredDiff = filterDiff(userFilteredDiff, generatedFilenames);
     const excludedFilesSummary = buildExcludedFilesSummary(generatedFiles);
 
     if (generatedFiles.length > 0) {
