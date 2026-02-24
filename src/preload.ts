@@ -99,6 +99,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   dismissUpdate: (version: string): Promise<void> => ipcRenderer.invoke('dismiss-update', version),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),
+  openLogsDirectory: (): Promise<void> => ipcRenderer.invoke('open-logs-directory'),
+  openReviewPrompt: (id: string): Promise<void> => ipcRenderer.invoke('open-review-prompt', id),
   detectBinaryPath: (name: string): Promise<string> => ipcRenderer.invoke('detect-binary-path', name),
   checkCliInstalled: (provider: string): Promise<{ installed: boolean; resolvedPath: string }> =>
     ipcRenderer.invoke('check-cli-installed', provider),

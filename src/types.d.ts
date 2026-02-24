@@ -52,6 +52,8 @@ declare global {
       offUpdateAvailable: () => void;
       dismissUpdate: (version: string) => Promise<void>;
       openExternal: (url: string) => Promise<void>;
+      openLogsDirectory: () => Promise<void>;
+      openReviewPrompt: (id: string) => Promise<void>;
       detectBinaryPath: (name: string) => Promise<string>;
       checkCliInstalled: (provider: string) => Promise<{ installed: boolean; resolvedPath: string }>;
       applyUpdate: () => Promise<void>;

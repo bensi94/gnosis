@@ -233,6 +233,53 @@ function runOAuthFlow(): Promise<void> {
   });
 }
 
+// ── Persistent logging ───────────────────────────────────────────
+
+function getLogsDir() {
+  return path.join(app.getPath('userData'), 'logs');
+}
+
+function setupLogging() {
+  const logsDir = getLogsDir();
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+
+  const logPath = path.join(logsDir, 'main.log');
+  const prevPath = path.join(logsDir, 'main.log.1');
+
+  // Rotate previous log
+  if (fs.existsSync(logPath)) {
+    try {
+      fs.renameSync(logPath, prevPath);
+    } catch {
+      // Best-effort rotation
+    }
+  }
+
+  const stream = fs.createWriteStream(logPath, { flags: 'a' });
+  const origLog = console.log.bind(console);
+  const origWarn = console.warn.bind(console);
+  const origError = console.error.bind(console);
+
+  function write(level: string, args: unknown[]) {
+    const ts = new Date().toISOString();
+    const msg = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+    stream.write(`${ts} [${level}] ${msg}\n`);
+  }
+
+  console.log = (...args: unknown[]) => {
+    origLog(...args);
+    write('info', args);
+  };
+  console.warn = (...args: unknown[]) => {
+    origWarn(...args);
+    write('warn', args);
+  };
+  console.error = (...args: unknown[]) => {
+    origError(...args);
+    write('error', args);
+  };
+}
+
 // ── Window ───────────────────────────────────────────────────────
 
 function createWindow() {
@@ -309,6 +356,8 @@ function setupAutoUpdater() {
 }
 
 void app.whenReady().then(() => {
+  setupLogging();
+
   // Expose packaged state to preload via env var (before creating windows)
   process.env.APP_IS_PACKAGED = app.isPackaged ? '1' : '0';
 
@@ -500,6 +549,19 @@ ipcMain.handle('open-external', (_event, url: string) => {
   }
 });
 
+ipcMain.handle('open-logs-directory', () => {
+  const logsDir = getLogsDir();
+  if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+  void shell.openPath(logsDir);
+});
+
+ipcMain.handle('open-review-prompt', (_event, id: string) => {
+  const promptPath = path.join(getReviewsDir(), `${id}-prompt.md`);
+  if (fs.existsSync(promptPath)) {
+    void shell.openPath(promptPath);
+  }
+});
+
 // Backward-compat shim — renderer still calls getConfig to check if signed in
 ipcMain.handle('get-config', () => {
   const token = getResolvedToken();
@@ -579,8 +641,10 @@ ipcMain.handle('re-render-hunks', async (_event, review: ReviewGuide) => {
 });
 
 ipcMain.handle('delete-review', (_event, id: string) => {
-  const filePath = path.join(getReviewsDir(), `${id}.json`);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  const reviewPath = path.join(getReviewsDir(), `${id}.json`);
+  const promptPath = path.join(getReviewsDir(), `${id}-prompt.md`);
+  if (fs.existsSync(reviewPath)) fs.unlinkSync(reviewPath);
+  if (fs.existsSync(promptPath)) fs.unlinkSync(promptPath);
   const index = readReviewsIndex().filter((e) => e.id !== id);
   fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
 });
@@ -589,7 +653,7 @@ ipcMain.handle('delete-all-reviews', () => {
   const dir = getReviewsDir();
   if (fs.existsSync(dir)) {
     for (const file of fs.readdirSync(dir)) {
-      if (file.endsWith('.json')) fs.unlinkSync(path.join(dir, file));
+      if (file.endsWith('.json') || file.endsWith('-prompt.md')) fs.unlinkSync(path.join(dir, file));
     }
   }
   fs.writeFileSync(getReviewsIndexPath(), JSON.stringify([], null, 2));
@@ -822,7 +886,18 @@ async function runBackgroundGeneration(
         allowedTools,
         reviewSuggestions ?? true,
         webResearch ?? false,
-        (toolName) => broadcastToAllWindows('review-tool-use', { reviewId, toolName })
+        (toolName) => broadcastToAllWindows('review-tool-use', { reviewId, toolName }),
+        (system, userMessage) => {
+          try {
+            ensureReviewsDir();
+            fs.writeFileSync(
+              path.join(getReviewsDir(), `${reviewId}-prompt.md`),
+              `# System Prompt\n\n${system}\n\n# User Message\n\n${userMessage}\n`
+            );
+          } catch {
+            // Best-effort — don't fail the review if prompt save fails
+          }
+        }
       );
     } finally {
       if (mcpConfigPath) cleanupMcpConfig(mcpConfigPath);
