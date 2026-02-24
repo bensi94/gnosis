@@ -54,7 +54,14 @@ declare global {
       openExternal: (url: string) => Promise<void>;
       detectBinaryPath: (name: string) => Promise<string>;
       checkCliInstalled: (provider: string) => Promise<{ installed: boolean; resolvedPath: string }>;
+      applyUpdate: () => Promise<void>;
+      restartToUpdate: () => Promise<void>;
+      onUpdateDownloaded: (callback: () => void) => void;
+      offUpdateDownloaded: () => void;
+      onUpdateError: (callback: (message: string) => void) => void;
+      offUpdateError: () => void;
       platform: NodeJS.Platform;
+      isPackaged: boolean;
     };
   }
 }

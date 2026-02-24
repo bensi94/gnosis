@@ -1,17 +1,30 @@
 import { useState, useEffect } from 'react';
-import { ArrowUpCircle, X, Copy, Check, Download } from 'lucide-react';
+import { ArrowUpCircle, X, Download, RotateCw, Loader2 } from 'lucide-react';
 import type { UpdateInfo } from '../lib/types';
 
-const BREW_COMMAND = 'brew update && brew upgrade --cask gnosis';
+type UpdateState = 'available' | 'downloading' | 'ready' | 'error';
+
+const supportsAutoUpdate = window.electronAPI.platform !== 'linux' && window.electronAPI.isPackaged;
 
 export function UpdateBanner() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
-  const [copied, setCopied] = useState(false);
-  const isMac = window.electronAPI.platform === 'darwin';
+  const [state, setState] = useState<UpdateState>('available');
 
   useEffect(() => {
-    window.electronAPI.onUpdateAvailable((info) => setUpdate(info));
+    window.electronAPI.onUpdateAvailable((info) => {
+      setUpdate(info);
+      setState('available');
+    });
     return () => window.electronAPI.offUpdateAvailable();
+  }, []);
+
+  useEffect(() => {
+    window.electronAPI.onUpdateDownloaded(() => setState('ready'));
+    window.electronAPI.onUpdateError(() => setState('error'));
+    return () => {
+      window.electronAPI.offUpdateDownloaded();
+      window.electronAPI.offUpdateError();
+    };
   }, []);
 
   if (!update) return null;
@@ -23,39 +36,59 @@ export function UpdateBanner() {
     setUpdate(null);
   }
 
-  function handleCopy() {
-    void navigator.clipboard.writeText(BREW_COMMAND).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+  function handleUpdate() {
+    setState('downloading');
+    void window.electronAPI.applyUpdate();
+  }
+
+  function handleRestart() {
+    void window.electronAPI.restartToUpdate();
   }
 
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2 text-sm updateBanner">
       <div className="flex items-center gap-2">
         <ArrowUpCircle className="h-4 w-4 shrink-0" />
-        <span>
-          Gnosis <strong>v{version}</strong> is available
-        </span>
-        {isMac ? (
-          <>
-            <code className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-xs font-mono">{BREW_COMMAND}</code>
+
+        {state === 'downloading' ? (
+          <span className="flex items-center gap-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Downloading update...
+          </span>
+        ) : state === 'ready' ? (
+          <span className="flex items-center gap-2">
+            Update ready &mdash;
             <button
-              onClick={handleCopy}
-              className="rounded p-0.5 transition-colors hover:bg-white/10"
-              title="Copy command"
+              onClick={handleRestart}
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors updateBanner-btn"
             >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              <RotateCw className="h-3 w-3" />
+              Restart
             </button>
-          </>
+          </span>
         ) : (
-          <button
-            onClick={() => void window.electronAPI.openExternal(releaseUrl)}
-            className="ml-1 inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors updateBanner-btn"
-          >
-            <Download className="h-3 w-3" />
-            Download
-          </button>
+          <>
+            <span>
+              Gnosis <strong>v{version}</strong> is available
+            </span>
+            {supportsAutoUpdate && state === 'available' ? (
+              <button
+                onClick={handleUpdate}
+                className="ml-1 inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors updateBanner-btn"
+              >
+                <Download className="h-3 w-3" />
+                Update
+              </button>
+            ) : (
+              <button
+                onClick={() => void window.electronAPI.openExternal(releaseUrl)}
+                className="ml-1 inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors updateBanner-btn"
+              >
+                <Download className="h-3 w-3" />
+                Download
+              </button>
+            )}
+          </>
         )}
       </div>
       <button onClick={handleDismiss} className="shrink-0 transition-opacity hover:opacity-80">
