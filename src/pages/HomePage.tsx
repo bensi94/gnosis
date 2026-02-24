@@ -13,6 +13,7 @@ import {
   Loader2,
   CircleX,
   FileText,
+  RefreshCw,
 } from 'lucide-react';
 import { GitHubIcon } from '../../lib/constants';
 import { Button } from '../../components/ui/button';
@@ -184,8 +185,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     };
   }, []);
 
-  useEffect(() => {
-    if (typeof authStatus !== 'object') return;
+  const fetchPendingReviews = useCallback(() => {
     setPendingLoading(true);
     void window.electronAPI
       .searchPullRequests()
@@ -194,7 +194,12 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
       })
       .catch(() => {})
       .finally(() => setPendingLoading(false));
-  }, [authStatus]);
+  }, []);
+
+  useEffect(() => {
+    if (typeof authStatus !== 'object') return;
+    fetchPendingReviews();
+  }, [authStatus, fetchPendingReviews]);
 
   const savePrefs = useCallback(
     (overrides?: Partial<Preferences>) => {
@@ -438,9 +443,20 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
 
                   {/* Pending review requests */}
                   <div className="flex flex-col gap-0.5">
-                    <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Pending reviews
-                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Pending reviews
+                      </label>
+                      <button
+                        type="button"
+                        onClick={fetchPendingReviews}
+                        disabled={pendingLoading}
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                        aria-label="Reload pending reviews"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${pendingLoading ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
                     {pendingLoading ? (
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-1">
                         <Loader2 className="h-3 w-3 animate-spin" />
