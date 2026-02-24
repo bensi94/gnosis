@@ -616,9 +616,13 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                               </Badge>
                             )}
                             {latestStatus === 'failed' && (
-                              <Badge variant="outline" className="shrink-0 text-xs border-red-500/30 text-red-400">
-                                <CircleX className="h-3 w-3 mr-1" />
-                                Failed
+                              <Badge
+                                variant="outline"
+                                className="shrink-0 text-xs border-red-500/30 text-red-400 max-w-[200px]"
+                                title={group.latestReview.error ?? 'Failed'}
+                              >
+                                <CircleX className="h-3 w-3 mr-1 shrink-0" />
+                                <span className="truncate">{group.latestReview.error ?? 'Failed'}</span>
                               </Badge>
                             )}
                             {latestStatus === 'completed' && (
@@ -673,9 +677,11 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                                       {reviewStatus === 'failed' && (
                                         <Badge
                                           variant="outline"
-                                          className="shrink-0 text-xs border-red-500/30 text-red-400"
+                                          className="shrink-0 text-xs border-red-500/30 text-red-400 max-w-[200px]"
+                                          title={review.error ?? 'Failed'}
                                         >
-                                          Failed
+                                          <CircleX className="h-3 w-3 mr-1 shrink-0" />
+                                          <span className="truncate">{review.error ?? 'Failed'}</span>
                                         </Badge>
                                       )}
                                       {reviewStatus === 'completed' && (
