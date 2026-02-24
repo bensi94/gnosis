@@ -574,7 +574,9 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
 
                       return (
                         <li key={group.prUrl}>
-                          <div className="flex items-center gap-1 px-4 py-3 hover:bg-muted/50 transition-colors group">
+                          <div
+                            className={`flex items-center gap-1 px-4 py-3 hover:bg-muted/50 transition-colors group ${isClickable ? 'cursor-pointer' : ''}`}
+                          >
                             <div className="shrink-0 w-5 flex items-center justify-center">
                               {hasMultiple && (
                                 <button
