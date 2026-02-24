@@ -13,6 +13,7 @@ import {
   Loader2,
   CircleX,
   FileText,
+  RefreshCw,
 } from 'lucide-react';
 import { GitHubIcon } from '../../lib/constants';
 import { Button } from '../../components/ui/button';
@@ -23,7 +24,7 @@ import { PRPickerDialog } from '../../components/PRPickerDialog';
 import { SettingsDialog } from '../../components/SettingsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { riskConfig } from '../../lib/constants';
-import type { ModelId, Preferences, Provider, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
+import type { ModelId, Preferences, Provider, PrSearchResult, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
 import { timeAgo, formatDuration, groupReviewsByPR } from '../../lib/utils';
 
 interface Props {
@@ -133,6 +134,8 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [cliNotFound, setCliNotFound] = useState<{ provider: string } | null>(null);
   const [expandedPRs, setExpandedPRs] = useState<Set<string>>(new Set());
   const [reviewPhases, setReviewPhases] = useState<Map<string, string>>(new Map());
+  const [pendingReviews, setPendingReviews] = useState<PrSearchResult[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
 
   const prGroups = useMemo(() => groupReviewsByPR(history), [history]);
 
@@ -181,6 +184,22 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
       window.electronAPI.offReviewFailed();
     };
   }, []);
+
+  const fetchPendingReviews = useCallback(() => {
+    setPendingLoading(true);
+    void window.electronAPI
+      .searchPullRequests()
+      .then((results) => {
+        setPendingReviews(results.filter((r) => r.role === 'review-requested' && !r.isDraft));
+      })
+      .catch(() => {})
+      .finally(() => setPendingLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (typeof authStatus !== 'object') return;
+    fetchPendingReviews();
+  }, [authStatus, fetchPendingReviews]);
 
   const savePrefs = useCallback(
     (overrides?: Partial<Preferences>) => {
@@ -421,6 +440,57 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                       </div>
                     </DialogContent>
                   </Dialog>
+
+                  {/* Pending review requests */}
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Pending reviews
+                      </label>
+                      <button
+                        type="button"
+                        onClick={fetchPendingReviews}
+                        disabled={pendingLoading}
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                        aria-label="Reload pending reviews"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${pendingLoading ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
+                    {pendingLoading ? (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Loading…
+                      </div>
+                    ) : pendingReviews.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-1">No pending reviews</p>
+                    ) : (
+                      <>
+                        {pendingReviews.slice(0, 10).map((pr) => (
+                          <button
+                            key={pr.url}
+                            type="button"
+                            onClick={() => setPrUrl(pr.url)}
+                            className="flex items-center gap-2 text-left rounded-md px-2 py-1.5 hover:bg-muted/50 transition-colors min-w-0"
+                          >
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {pr.repoName} #{pr.number}
+                            </span>
+                            <span className="text-sm truncate">{pr.title}</span>
+                          </button>
+                        ))}
+                        {pendingReviews.length > 10 && (
+                          <button
+                            type="button"
+                            onClick={() => setPrPickerOpen(true)}
+                            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 text-left"
+                          >
+                            Show {pendingReviews.length - 10} more…
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
 
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="instructions" className="text-sm font-medium flex items-center gap-1.5">
