@@ -10,13 +10,14 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Loader2,
+  CircleX,
 } from 'lucide-react';
 import { GitHubIcon } from '../../lib/constants';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
-import { LoadingScreen } from '../../components/LoadingScreen';
 import { PRPickerDialog } from '../../components/PRPickerDialog';
 import { SettingsDialog } from '../../components/SettingsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
@@ -55,6 +56,10 @@ const PROVIDERS = {
 const MODEL_LABELS: Record<string, string> = Object.fromEntries(
   Object.values(PROVIDERS).flatMap((p) => p.models.map((m) => [m.id, `${p.label} ${m.label}`]))
 );
+
+function getEntryStatus(entry: ReviewHistoryEntry): 'generating' | 'completed' | 'failed' {
+  return entry.status ?? 'completed';
+}
 
 // ── Reusable toggle switch ──────────────────────────────────────
 
@@ -118,9 +123,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [webResearch, setWebResearch] = useState(false);
   const [instructions, setInstructions] = useState('');
   const [prefsLoaded, setPrefsLoaded] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [streamingText, setStreamingText] = useState('');
-  const [isThinkingPhase, setIsThinkingPhase] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [history, setHistory] = useState<ReviewHistoryEntry[]>([]);
@@ -128,7 +131,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cliNotFound, setCliNotFound] = useState<{ provider: string } | null>(null);
   const [expandedPRs, setExpandedPRs] = useState<Set<string>>(new Set());
-  const [activeToolCall, setActiveToolCall] = useState<string | null>(null);
+  const [reviewPhases, setReviewPhases] = useState<Map<string, string>>(new Map());
 
   const prGroups = useMemo(() => groupReviewsByPR(history), [history]);
 
@@ -148,6 +151,34 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
       setWebResearch(prefs.enableWebResearch);
       setPrefsLoaded(true);
     });
+  }, []);
+
+  // Listen for background review phase changes, completion, and failure
+  useEffect(() => {
+    window.electronAPI.onReviewPhase((reviewId, phase) => {
+      setReviewPhases((prev) => new Map(prev).set(reviewId, phase));
+    });
+    window.electronAPI.onReviewCompleted((reviewId) => {
+      setReviewPhases((prev) => {
+        const next = new Map(prev);
+        next.delete(reviewId);
+        return next;
+      });
+      void window.electronAPI.listReviews().then(setHistory);
+    });
+    window.electronAPI.onReviewFailed((reviewId) => {
+      setReviewPhases((prev) => {
+        const next = new Map(prev);
+        next.delete(reviewId);
+        return next;
+      });
+      void window.electronAPI.listReviews().then(setHistory);
+    });
+    return () => {
+      window.electronAPI.offReviewPhase();
+      window.electronAPI.offReviewCompleted();
+      window.electronAPI.offReviewFailed();
+    };
   }, []);
 
   const savePrefs = useCallback(
@@ -195,7 +226,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
 
   async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
-    if (!prUrl.trim()) return;
+    if (!prUrl.trim() || submitting) return;
 
     savePrefs();
     setError(null);
@@ -206,28 +237,10 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
       return;
     }
 
-    setStreamingText('');
-    setIsThinkingPhase(false);
-    setActiveToolCall(null);
-    setLoading(true);
-
-    window.electronAPI.offReviewProgress();
-    window.electronAPI.offReviewToolUse();
-    window.electronAPI.onReviewProgress((chunk, isThinking) => {
-      if (isThinking) {
-        setIsThinkingPhase(true);
-      } else {
-        setIsThinkingPhase(false);
-        setActiveToolCall(null);
-        setStreamingText((prev) => prev + chunk);
-      }
-    });
-    window.electronAPI.onReviewToolUse((toolName) => {
-      setActiveToolCall(toolName);
-    });
+    setSubmitting(true);
 
     try {
-      const review = await window.electronAPI.generateReview({
+      await window.electronAPI.startReview({
         prUrl: prUrl.trim(),
         provider,
         model,
@@ -238,25 +251,23 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
         reviewSuggestions,
         webResearch,
       });
-      void window.electronAPI.listReviews().then(setHistory);
-      onReviewReady(review);
+      // Refresh history to show the new "generating" entry
+      const updated = await window.electronAPI.listReviews();
+      setHistory(updated);
+      setPrUrl('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
-      setLoading(false);
+      setError(err instanceof Error ? err.message : 'Failed to start review.');
     } finally {
-      window.electronAPI.offReviewProgress();
-      window.electronAPI.offReviewToolUse();
+      setSubmitting(false);
     }
   }
 
   async function handleLoadFromHistory(id: string) {
-    setLoading(true);
     try {
       const review = await window.electronAPI.loadReview(id);
       onReviewReady(review);
     } catch {
       setError('Failed to load saved review.');
-      setLoading(false);
     }
   }
 
@@ -276,16 +287,6 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     setProvider(p);
     setModel(PROVIDERS[p].models[0].id);
     if (p === 'gemini') setThinking(false);
-  }
-
-  if (loading) {
-    return (
-      <LoadingScreen
-        message={isThinkingPhase ? 'Thinking...' : 'Generating review guide...'}
-        streamingText={streamingText}
-        activeToolCall={activeToolCall}
-      />
-    );
   }
 
   const isAuthenticated = typeof authStatus === 'object';
@@ -528,9 +529,18 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                     </Alert>
                   )}
 
-                  <Button type="submit" className="w-full gap-2">
-                    <Play className="h-4 w-4" />
-                    Generate Review
+                  <Button type="submit" className="w-full gap-2" disabled={submitting}>
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Starting…
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4" />
+                        Generate Review
+                      </>
+                    )}
                   </Button>
                 </form>
               </CardContent>
@@ -555,9 +565,11 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                 <CardContent className="p-0 flex-1 overflow-y-auto min-h-0">
                   <ul className="divide-y">
                     {prGroups.map((group) => {
+                      const latestStatus = getEntryStatus(group.latestReview);
                       const risk = riskConfig[group.latestReview.riskLevel];
                       const hasMultiple = group.reviews.length > 1;
                       const isExpanded = expandedPRs.has(group.prUrl);
+                      const isClickable = latestStatus === 'completed';
 
                       return (
                         <li key={group.prUrl}>
@@ -585,8 +597,9 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                               )}
                             </div>
                             <button
-                              onClick={() => handleLoadFromHistory(group.latestReview.id)}
-                              className="flex-1 min-w-0 flex items-center gap-3 text-left"
+                              onClick={() => isClickable && handleLoadFromHistory(group.latestReview.id)}
+                              className={`flex-1 min-w-0 flex items-center gap-3 text-left ${!isClickable ? 'cursor-default' : ''}`}
+                              disabled={!isClickable}
                             >
                               <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                                 <span className="text-sm font-medium truncate">{group.prTitle}</span>
@@ -596,11 +609,25 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                                 </span>
                               </div>
                             </button>
-                            <Badge variant="outline" className={`shrink-0 text-xs ${risk.badgeClassName}`}>
-                              {risk.label}
-                            </Badge>
+                            {latestStatus === 'generating' && (
+                              <Badge variant="outline" className="shrink-0 text-xs border-blue-500/30 text-blue-400">
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                {reviewPhases.get(group.latestReview.id) ?? 'Starting'}
+                              </Badge>
+                            )}
+                            {latestStatus === 'failed' && (
+                              <Badge variant="outline" className="shrink-0 text-xs border-red-500/30 text-red-400">
+                                <CircleX className="h-3 w-3 mr-1" />
+                                Failed
+                              </Badge>
+                            )}
+                            {latestStatus === 'completed' && (
+                              <Badge variant="outline" className={`shrink-0 text-xs ${risk.badgeClassName}`}>
+                                {risk.label}
+                              </Badge>
+                            )}
                             <div className="shrink-0 w-7 flex items-center justify-center">
-                              {!hasMultiple && (
+                              {!hasMultiple && latestStatus !== 'generating' && (
                                 <button
                                   onClick={(e) => handleDeleteFromHistory(e, group.latestReview.id)}
                                   className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity px-1"
@@ -615,12 +642,15 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                           {hasMultiple && isExpanded && (
                             <ul className="border-t border-border/50">
                               {group.reviews.map((review) => {
+                                const reviewStatus = getEntryStatus(review);
                                 const reviewRisk = riskConfig[review.riskLevel];
+                                const reviewClickable = reviewStatus === 'completed';
                                 return (
                                   <li key={review.id}>
                                     <button
-                                      onClick={() => handleLoadFromHistory(review.id)}
-                                      className="w-full flex items-center gap-3 pl-10 pr-4 py-2 text-left hover:bg-muted/30 transition-colors group/review"
+                                      onClick={() => reviewClickable && handleLoadFromHistory(review.id)}
+                                      className={`w-full flex items-center gap-3 pl-10 pr-4 py-2 text-left hover:bg-muted/30 transition-colors group/review ${!reviewClickable ? 'cursor-default' : ''}`}
+                                      disabled={!reviewClickable}
                                     >
                                       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                                         <span className="text-xs text-muted-foreground truncate">
@@ -631,19 +661,40 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                                           {timeAgo(review.savedAt)}
                                         </span>
                                       </div>
-                                      <Badge
-                                        variant="outline"
-                                        className={`shrink-0 text-xs ${reviewRisk.badgeClassName}`}
-                                      >
-                                        {reviewRisk.label}
-                                      </Badge>
-                                      <button
-                                        onClick={(e) => handleDeleteFromHistory(e, review.id)}
-                                        className="shrink-0 opacity-0 group-hover/review:opacity-100 text-muted-foreground hover:text-destructive transition-opacity px-1"
-                                        aria-label="Delete"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </button>
+                                      {reviewStatus === 'generating' && (
+                                        <Badge
+                                          variant="outline"
+                                          className="shrink-0 text-xs border-blue-500/30 text-blue-400"
+                                        >
+                                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                          {reviewPhases.get(review.id) ?? 'Starting'}
+                                        </Badge>
+                                      )}
+                                      {reviewStatus === 'failed' && (
+                                        <Badge
+                                          variant="outline"
+                                          className="shrink-0 text-xs border-red-500/30 text-red-400"
+                                        >
+                                          Failed
+                                        </Badge>
+                                      )}
+                                      {reviewStatus === 'completed' && (
+                                        <Badge
+                                          variant="outline"
+                                          className={`shrink-0 text-xs ${reviewRisk.badgeClassName}`}
+                                        >
+                                          {reviewRisk.label}
+                                        </Badge>
+                                      )}
+                                      {reviewStatus !== 'generating' && (
+                                        <button
+                                          onClick={(e) => handleDeleteFromHistory(e, review.id)}
+                                          className="shrink-0 opacity-0 group-hover/review:opacity-100 text-muted-foreground hover:text-destructive transition-opacity px-1"
+                                          aria-label="Delete"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      )}
                                     </button>
                                   </li>
                                 );

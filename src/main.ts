@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Notification, safeStorage, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -37,6 +37,7 @@ import type {
   ReviewHistoryEntry,
   Slide,
   SendSlideChatRequest,
+  StartReviewResult,
   SubmitReviewRequest,
   FreshnessResult,
 } from '../lib/types';
@@ -283,6 +284,9 @@ function startUpdateChecks() {
 }
 
 void app.whenReady().then(() => {
+  // Mark any stale "generating" entries from a previous crash as failed
+  cleanupStaleGeneratingEntries();
+
   applyBinaryOverrides(loadPreferences());
   createWindow();
   startUpdateChecks();
@@ -291,6 +295,14 @@ void app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
     if (!updateInterval) startUpdateChecks();
   });
+});
+
+app.on('before-quit', () => {
+  // Mark any in-flight generations as failed
+  for (const [id] of activeGenerations) {
+    updateHistoryEntry(id, { status: 'failed', error: 'App quit during generation' });
+  }
+  activeGenerations.clear();
 });
 
 app.on('window-all-closed', () => {
@@ -318,33 +330,62 @@ function ensureReviewsDir() {
 
 function readReviewsIndex(): ReviewHistoryEntry[] {
   try {
-    return JSON.parse(fs.readFileSync(getReviewsIndexPath(), 'utf-8')) as ReviewHistoryEntry[];
+    const entries = JSON.parse(fs.readFileSync(getReviewsIndexPath(), 'utf-8')) as ReviewHistoryEntry[];
+    // Backward compat: entries without status are completed
+    return entries.map((e) => ({ ...e, status: e.status ?? 'completed' }));
   } catch {
     return [];
   }
 }
 
-function saveReviewToHistory(review: ReviewGuide, model?: ModelId): void {
+// ── Background generation tracking ──────────────────────────────
+
+const activeGenerations = new Map<string, { abortController?: AbortController }>();
+
+function createPendingHistoryEntry(id: string, prTitle: string, prUrl: string, author: string, model?: ModelId): void {
   ensureReviewsDir();
-  const id = Date.now().toString();
-  const savedAt = new Date().toISOString();
-
-  fs.writeFileSync(path.join(getReviewsDir(), `${id}.json`), JSON.stringify(review));
-
   const entry: ReviewHistoryEntry = {
     id,
-    prTitle: review.prTitle,
-    prUrl: review.prUrl,
-    author: review.author,
-    riskLevel: review.riskLevel,
+    prTitle,
+    prUrl,
+    author,
+    riskLevel: 'low', // placeholder until generation completes
+    status: 'generating',
     model,
-    generationDurationMs: review.generationDurationMs,
-    savedAt,
+    savedAt: new Date().toISOString(),
   };
-
   const index = readReviewsIndex();
-  index.unshift(entry); // newest first
+  index.unshift(entry);
   fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
+}
+
+function updateHistoryEntry(id: string, updates: Partial<ReviewHistoryEntry>): void {
+  const index = readReviewsIndex();
+  const idx = index.findIndex((e) => e.id === id);
+  if (idx === -1) return;
+  index[idx] = { ...index[idx], ...updates };
+  fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
+}
+
+function broadcastToAllWindows(channel: string, ...args: unknown[]): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(channel, ...args);
+  }
+}
+
+function cleanupStaleGeneratingEntries(): void {
+  const index = readReviewsIndex();
+  let changed = false;
+  for (const entry of index) {
+    if (entry.status === 'generating') {
+      entry.status = 'failed';
+      entry.error = 'Generation was interrupted';
+      changed = true;
+    }
+  }
+  if (changed) {
+    fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
+  }
 }
 
 // ── Preferences helpers ─────────────────────────────────────────
@@ -606,29 +647,24 @@ ipcMain.handle('get-pr-status', async (_event, prUrl: string): Promise<PrStatus>
   };
 });
 
-ipcMain.handle(
-  'generate-review',
-  async (
-    _event,
-    {
-      prUrl,
-      provider,
-      model,
-      instructions,
-      thinking,
-      signalBoost,
-      smartImports,
-      reviewSuggestions,
-      webResearch,
-    }: GenerateReviewRequest
-  ) => {
+// ── Background review generation ────────────────────────────────
+
+async function runBackgroundGeneration(
+  reviewId: string,
+  request: GenerateReviewRequest,
+  prData: Awaited<ReturnType<typeof getPrMetadata>>
+): Promise<void> {
+  const { prUrl, provider, model, instructions, thinking, signalBoost, smartImports, reviewSuggestions, webResearch } =
+    request;
+
+  try {
     const token = getResolvedToken();
     const octokit = new Octokit({ auth: token ?? undefined });
-
     const { owner, repo, pullNumber } = parsePrUrl(prUrl);
 
-    const [prData, diff, changedFiles] = await Promise.all([
-      getPrMetadata(octokit, owner, repo, pullNumber),
+    broadcastToAllWindows('review-phase', { reviewId, phase: 'Fetching PR data' });
+
+    const [diff, changedFiles] = await Promise.all([
       getPrDiff(octokit, owner, repo, pullNumber),
       getChangedFiles(octokit, owner, repo, pullNumber),
     ]);
@@ -653,6 +689,8 @@ ipcMain.handle(
     const baseRef = prData.baseBranch;
     const headRef = prData.headSha;
 
+    broadcastToAllWindows('review-phase', { reviewId, phase: 'Fetching file contents' });
+
     const fileContents: Record<string, string> = {};
     const headFileContents: Record<string, string> = {};
     const concurrency = 5;
@@ -674,6 +712,8 @@ ipcMain.handle(
       ]);
     }
 
+    broadcastToAllWindows('review-phase', { reviewId, phase: 'Resolving imports' });
+
     const allFileContents = { ...fileContents, ...headFileContents };
     const neighborFiles = await getNeighborFiles(
       octokit,
@@ -684,6 +724,8 @@ ipcMain.handle(
       baseRef,
       smartImports ? provider : undefined
     );
+
+    broadcastToAllWindows('review-phase', { reviewId, phase: 'Building context' });
 
     // Parse diff into indexed hunks and build expanded diff (using filtered diff)
     const indexedHunks = buildIndexedHunks(filteredDiff, fileContents, headFileContents);
@@ -701,7 +743,9 @@ ipcMain.handle(
       excludedFilesSummary
     );
 
-    console.log('[main] Generating review guide...');
+    broadcastToAllWindows('review-phase', { reviewId, phase: 'Generating review' });
+
+    console.log(`[main] Generating review guide (${reviewId})...`);
     const generationStart = Date.now();
 
     const prefs = loadPreferences();
@@ -720,6 +764,7 @@ ipcMain.handle(
     }
 
     let aiResult;
+    let lastStreamPhase: string | null = null;
     try {
       aiResult = await generateReviewGuide(
         contextPackage,
@@ -727,14 +772,21 @@ ipcMain.handle(
         provider,
         model,
         instructions,
-        (chunk, isThinking) => _event.sender.send('review-progress', { chunk, isThinking }),
+        (chunk, isThinking) => {
+          const phase = isThinking ? 'Thinking' : 'Generating review';
+          if (phase !== lastStreamPhase) {
+            lastStreamPhase = phase;
+            broadcastToAllWindows('review-phase', { reviewId, phase });
+          }
+          broadcastToAllWindows('review-progress', { reviewId, chunk, isThinking });
+        },
         thinking ?? false,
         signalBoost ?? false,
         mcpConfigPath,
         allowedTools,
         reviewSuggestions ?? true,
         webResearch ?? false,
-        (toolName) => _event.sender.send('review-tool-use', { toolName })
+        (toolName) => broadcastToAllWindows('review-tool-use', { reviewId, toolName })
       );
     } finally {
       if (mcpConfigPath) cleanupMcpConfig(mcpConfigPath);
@@ -753,7 +805,6 @@ ipcMain.handle(
         .filter((id: string) => hunkMap.has(id) && !assignedIds.has(id))
         .map((id: string) => {
           assignedIds.add(id);
-          // Safe: filter above guarantees hunkMap.has(id)
           const h = hunkMap.get(id);
           if (!h) throw new Error(`Hunk ${id} not found in index`);
           return {
@@ -857,6 +908,8 @@ ipcMain.handle(
       webSources: aiResult.webSources,
     };
 
+    broadcastToAllWindows('review-phase', { reviewId, phase: 'Rendering' });
+
     // Render syntax-highlighted HTML for each hunk
     const codeTheme = loadPreferences().codeTheme;
     for (const slide of reviewGuide.slides) {
@@ -870,10 +923,77 @@ ipcMain.handle(
       }
     }
 
-    saveReviewToHistory(reviewGuide, model);
-    return reviewGuide;
+    // Save review JSON and update history entry to completed
+    fs.writeFileSync(path.join(getReviewsDir(), `${reviewId}.json`), JSON.stringify(reviewGuide));
+    updateHistoryEntry(reviewId, {
+      status: 'completed',
+      riskLevel: reviewGuide.riskLevel,
+      generationDurationMs,
+    });
+
+    broadcastToAllWindows('review-completed', { reviewId });
+
+    // Desktop notification
+    const notif = new Notification({
+      title: 'Review ready',
+      body: prData.title,
+    });
+    notif.on('click', () => {
+      broadcastToAllWindows('review-navigate', { reviewId });
+      const windows = BrowserWindow.getAllWindows();
+      if (windows.length > 0) {
+        const win = windows[0];
+        if (win.isMinimized()) win.restore();
+        win.focus();
+      }
+    });
+    notif.show();
+
+    console.log(`[main] Review ${reviewId} completed in ${formatMs(generationDurationMs)}`);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error(`[main] Review ${reviewId} failed:`, errorMessage);
+
+    updateHistoryEntry(reviewId, {
+      status: 'failed',
+      error: errorMessage,
+    });
+
+    broadcastToAllWindows('review-failed', { reviewId, error: errorMessage });
+  } finally {
+    activeGenerations.delete(reviewId);
   }
-);
+}
+
+function formatMs(ms: number): string {
+  const s = Math.round(ms / 1000);
+  return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
+}
+
+ipcMain.handle('start-review', async (_event, request: GenerateReviewRequest): Promise<StartReviewResult> => {
+  const token = getResolvedToken();
+  const octokit = new Octokit({ auth: token ?? undefined });
+  const { owner, repo, pullNumber } = parsePrUrl(request.prUrl);
+
+  // Fetch PR metadata (fast, single API call)
+  const prData = await getPrMetadata(octokit, owner, repo, pullNumber);
+
+  const reviewId = crypto.randomUUID();
+
+  // Create pending history entry
+  createPendingHistoryEntry(reviewId, prData.title, request.prUrl, prData.author, request.model);
+
+  // Track and fire off background generation (no await)
+  activeGenerations.set(reviewId, {});
+  void runBackgroundGeneration(reviewId, request, prData);
+
+  return {
+    reviewId,
+    prTitle: prData.title,
+    prUrl: request.prUrl,
+    author: prData.author,
+  };
+});
 
 ipcMain.handle('send-slide-chat', async (_event, req: SendSlideChatRequest) => {
   const chatProvider = getProvider(req.provider);
