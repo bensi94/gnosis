@@ -1,4 +1,5 @@
 import type {
+  ChangedFile,
   GenerateReviewRequest,
   Preferences,
   PrSearchResult,
@@ -56,6 +57,7 @@ declare global {
       openReviewPrompt: (id: string) => Promise<void>;
       detectBinaryPath: (name: string) => Promise<string>;
       checkCliInstalled: (provider: string) => Promise<{ installed: boolean; resolvedPath: string }>;
+      getPrFiles: (prUrl: string) => Promise<ChangedFile[]>;
       platform: NodeJS.Platform;
       isPackaged: boolean;
     };

@@ -208,6 +208,7 @@ export interface GenerateReviewRequest {
   smartImports?: boolean;
   reviewSuggestions?: boolean;
   webResearch?: boolean;
+  excludedFiles?: string[];
 }
 
 export interface GenerateReviewResponse {
