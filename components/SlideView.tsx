@@ -140,7 +140,7 @@ export function SlideView({
                 })}
               </ul>
             ) : (
-              <Markdown className="text-sm review-focus-content">{slide.reviewFocus}</Markdown>
+              <Markdown className="text-sm review-focus-content">{slide.reviewFocus ?? ''}</Markdown>
             )}
           </div>
 
