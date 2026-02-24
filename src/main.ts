@@ -346,11 +346,14 @@ function setupAutoUpdater() {
   autoUpdater.on('update-downloaded', (_event, _releaseNotes, releaseName) => {
     const version = releaseName ? ` ${releaseName}` : '';
     console.log(`[main] Update${version} downloaded, will install on exit`);
-    const notif = new Notification({
-      title: 'A new update is ready to install',
-      body: `Gnosis${version} has been downloaded and will be automatically installed on exit`,
-    });
-    notif.show();
+    if (loadPreferences().notifications) {
+      const notif = new Notification({
+        title: 'A new update is ready to install',
+        body: `Gnosis${version} has been downloaded and will be automatically installed on exit`,
+        silent: true,
+      });
+      notif.show();
+    }
   });
 
   autoUpdater.on('error', (err: Error) => {
@@ -496,6 +499,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   codeFont: 'jetbrains-mono',
   claudePath: '',
   geminiPath: '',
+  notifications: true,
   diffLayout: 'unified',
 };
 
@@ -1048,20 +1052,23 @@ async function runBackgroundGeneration(
     broadcastToAllWindows('review-completed', { reviewId });
 
     // Desktop notification
-    const notif = new Notification({
-      title: 'Review ready',
-      body: prData.title,
-    });
-    notif.on('click', () => {
-      broadcastToAllWindows('review-navigate', { reviewId });
-      const windows = BrowserWindow.getAllWindows();
-      if (windows.length > 0) {
-        const win = windows[0];
-        if (win.isMinimized()) win.restore();
-        win.focus();
-      }
-    });
-    notif.show();
+    if (loadPreferences().notifications) {
+      const notif = new Notification({
+        title: 'Review ready',
+        body: prData.title,
+        silent: true,
+      });
+      notif.on('click', () => {
+        broadcastToAllWindows('review-navigate', { reviewId });
+        const windows = BrowserWindow.getAllWindows();
+        if (windows.length > 0) {
+          const win = windows[0];
+          if (win.isMinimized()) win.restore();
+          win.focus();
+        }
+      });
+      notif.show();
+    }
 
     console.log(`[main] Review ${reviewId} completed in ${formatMs(generationDurationMs)}`);
   } catch (err) {

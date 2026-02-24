@@ -22,6 +22,7 @@ export function SettingsDialog({ open, onOpenChange, onThemeChange }: Props) {
   const [codeTheme, setCodeTheme] = useState<CodeTheme>('aurora-x');
   const [codeFont, setCodeFont] = useState<CodeFont>('jetbrains-mono');
   const [enableTools, setEnableTools] = useState(false);
+  const [notifications, setNotifications] = useState(true);
   const [claudePath, setClaudePath] = useState('');
   const [geminiPath, setGeminiPath] = useState('');
   const [claudeDetected, setClaudeDetected] = useState('');
@@ -33,6 +34,7 @@ export function SettingsDialog({ open, onOpenChange, onThemeChange }: Props) {
       if (prefs.codeTheme) setCodeTheme(prefs.codeTheme as CodeTheme);
       if (prefs.codeFont) setCodeFont(prefs.codeFont as CodeFont);
       setEnableTools(prefs.enableTools);
+      setNotifications(prefs.notifications);
       setClaudePath(prefs.claudePath || '');
       setGeminiPath(prefs.geminiPath || '');
     });
@@ -131,6 +133,32 @@ export function SettingsDialog({ open, onOpenChange, onThemeChange }: Props) {
               <span
                 className={`pointer-events-none block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
                   enableTools ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-0.5">
+              <label className="text-sm font-medium">Desktop notifications</label>
+              <p className="text-xs text-muted-foreground">Notify when a review completes</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={notifications}
+              onClick={() => {
+                const next = !notifications;
+                setNotifications(next);
+                saveField({ notifications: next });
+              }}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                notifications ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span
+                className={`pointer-events-none block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                  notifications ? 'translate-x-4' : 'translate-x-0'
                 }`}
               />
             </button>
