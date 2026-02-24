@@ -179,6 +179,7 @@ export interface Preferences {
   codeFont: string;
   claudePath: string;
   geminiPath: string;
+  notifications: boolean;
   diffLayout: 'unified' | 'split';
 }
 
