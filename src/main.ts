@@ -340,19 +340,26 @@ function setupAutoUpdater() {
     autoUpdater.setFeedURL({ url: feedURL });
   } catch (err) {
     console.warn('[main] Failed to set autoUpdater feed URL:', err);
+    return;
   }
 
-  autoUpdater.on('update-downloaded', () => {
-    for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send('auto-update-downloaded');
-    }
+  autoUpdater.on('update-downloaded', (_event, _releaseNotes, releaseName) => {
+    const version = releaseName ? ` ${releaseName}` : '';
+    console.log(`[main] Update${version} downloaded, will install on exit`);
+    const notif = new Notification({
+      title: 'A new update is ready to install',
+      body: `Gnosis${version} has been downloaded and will be automatically installed on exit`,
+    });
+    notif.show();
   });
 
   autoUpdater.on('error', (err: Error) => {
-    for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send('auto-update-error', err.message);
-    }
+    console.warn('[main] Auto-updater error:', err.message);
   });
+
+  // Check for updates automatically — download happens silently
+  autoUpdater.checkForUpdates();
+  setInterval(() => autoUpdater.checkForUpdates(), 4 * 60 * 60 * 1_000);
 }
 
 void app.whenReady().then(() => {
@@ -365,12 +372,16 @@ void app.whenReady().then(() => {
   cleanupStaleGeneratingEntries();
   applyBinaryOverrides(loadPreferences());
   createWindow();
-  startUpdateChecks();
   setupAutoUpdater();
+
+  // GitHub release polling only needed on platforms without native auto-update (Linux, dev)
+  if (process.platform === 'linux' || !app.isPackaged) {
+    startUpdateChecks();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    if (!updateInterval) startUpdateChecks();
+    if (!updateInterval && (process.platform === 'linux' || !app.isPackaged)) startUpdateChecks();
   });
 });
 
@@ -529,14 +540,6 @@ const WEB_ONLY_TOOLS = ['WebFetch', 'WebSearch'];
 
 ipcMain.handle('dismiss-update', (_event, version: string) => {
   dismissedUpdateVersion = version;
-});
-
-ipcMain.handle('apply-update', () => {
-  autoUpdater.checkForUpdates();
-});
-
-ipcMain.handle('restart-to-update', () => {
-  autoUpdater.quitAndInstall();
 });
 
 ipcMain.handle('open-external', (_event, url: string) => {
