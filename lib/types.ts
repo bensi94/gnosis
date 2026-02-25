@@ -181,6 +181,7 @@ export interface Preferences {
   geminiPath: string;
   notifications: boolean;
   diffLayout: 'unified' | 'split';
+  includeAllFiles: boolean;
 }
 
 export interface SendSlideChatRequest {
