@@ -479,7 +479,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
             <div className="flex flex-col gap-4">
               {/* Account card */}
               <Card>
-                <CardContent className="py-3 flex items-center justify-between">
+                <CardContent className="py-2 px-3 flex items-center justify-between">
                   <span className="text-xs text-muted-foreground flex items-center gap-2">
                     <Avatar className="h-5 w-5">
                       <AvatarImage
