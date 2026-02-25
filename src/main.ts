@@ -555,6 +555,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   notifications: true,
   diffLayout: 'unified',
   includeAllFiles: true,
+  reviewSignature: true,
 };
 
 function applyBinaryOverrides(prefs: Preferences): void {
@@ -1317,6 +1318,11 @@ ipcMain.handle('submit-review', async (_event, req: SubmitReviewRequest) => {
     const droppedText = droppedComments.map((c) => `**${c.path}:${c.line}** — ${c.body}`).join('\n\n');
     const suffix = `\n\n---\n_${droppedComments.length} comment(s) could not be posted inline (lines outside the diff range):_\n\n${droppedText}`;
     reviewBody = (reviewBody || '') + suffix;
+  }
+
+  const prefs = loadPreferences();
+  if (prefs.reviewSignature) {
+    reviewBody = (reviewBody || '') + '\n\n---\n_Reviewed using [gnosis.to](https://gnosis.to)_';
   }
 
   const { data } = await octokit.pulls.createReview({
