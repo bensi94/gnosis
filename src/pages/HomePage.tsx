@@ -30,6 +30,7 @@ import { PRPickerDialog } from '../../components/PRPickerDialog';
 import { FilePickerDialog } from '../../components/FilePickerDialog';
 import { SettingsDialog } from '../../components/SettingsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip';
 import { riskConfig } from '../../lib/constants';
 import type { ModelId, Preferences, Provider, PrSearchResult, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
 import { timeAgo, formatDuration, formatBytes, groupReviewsByPR } from '../../lib/utils';
@@ -768,21 +769,29 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                       const state = livePrStates.get(g.prUrl)?.prState ?? g.latestReview.prState;
                       return state === 'merged' || state === 'closed';
                     }) && (
-                      <button
-                        onClick={() => void handleDeleteClosedPRs()}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                        title="Remove merged & closed PRs"
-                      >
-                        <Eraser className="h-3.5 w-3.5" />
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => void handleDeleteClosedPRs()}
+                            className="text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <Eraser className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Remove merged &amp; closed PRs</TooltipContent>
+                      </Tooltip>
                     )}
-                    <button
-                      onClick={handleDeleteAllHistory}
-                      className="text-muted-foreground hover:text-destructive transition-colors"
-                      title="Delete all history"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={handleDeleteAllHistory}
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete all history</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
                 <CardContent className="p-0 flex-1 overflow-y-auto min-h-0">
