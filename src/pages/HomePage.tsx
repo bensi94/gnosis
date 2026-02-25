@@ -14,6 +14,11 @@ import {
   CircleX,
   FileText,
   RefreshCw,
+  X,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  AlertTriangle,
 } from 'lucide-react';
 import { GitHubIcon } from '../../lib/constants';
 import { Button } from '../../components/ui/button';
@@ -26,7 +31,7 @@ import { SettingsDialog } from '../../components/SettingsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { riskConfig } from '../../lib/constants';
 import type { ModelId, Preferences, Provider, PrSearchResult, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
-import { timeAgo, formatDuration, groupReviewsByPR } from '../../lib/utils';
+import { timeAgo, formatDuration, formatBytes, groupReviewsByPR } from '../../lib/utils';
 
 interface Props {
   onReviewReady: (review: ReviewGuide) => void;
@@ -139,6 +144,10 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [reviewPhases, setReviewPhases] = useState<Map<string, string>>(new Map());
   const [pendingReviews, setPendingReviews] = useState<PrSearchResult[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
+  const [generationStartTimes, setGenerationStartTimes] = useState<Map<string, number>>(new Map());
+  const [elapsedSeconds, setElapsedSeconds] = useState<Map<string, number>>(new Map());
+  const [reviewBytes, setReviewBytes] = useState<Map<string, { inputBytes: number; outputBytes: number }>>(new Map());
+  const [outdatedPrs, setOutdatedPrs] = useState<Set<string>>(new Set());
 
   const prGroups = useMemo(() => groupReviewsByPR(history), [history]);
 
@@ -161,29 +170,58 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     });
   }, []);
 
-  // Listen for background review phase changes, completion, and failure
+  // Listen for background review phase changes, completion, failure, and stats
   useEffect(() => {
     window.electronAPI.onReviewPhase((reviewId, phase) => {
       setReviewPhases((prev) => new Map(prev).set(reviewId, phase));
     });
-    window.electronAPI.onReviewCompleted((reviewId) => {
+    window.electronAPI.onReviewProgress((reviewId, chunk, isThinking) => {
+      if (!isThinking) {
+        setReviewBytes((prev) => {
+          const next = new Map(prev);
+          const existing = next.get(reviewId) ?? { inputBytes: 0, outputBytes: 0 };
+          next.set(reviewId, { ...existing, outputBytes: existing.outputBytes + chunk.length });
+          return next;
+        });
+      }
+    });
+    window.electronAPI.onReviewStats((reviewId, inputBytes) => {
+      setReviewBytes((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(reviewId) ?? { inputBytes: 0, outputBytes: 0 };
+        next.set(reviewId, { ...existing, inputBytes });
+        return next;
+      });
+    });
+    const clearReview = (reviewId: string) => {
       setReviewPhases((prev) => {
         const next = new Map(prev);
         next.delete(reviewId);
         return next;
       });
+      setGenerationStartTimes((prev) => {
+        const next = new Map(prev);
+        next.delete(reviewId);
+        return next;
+      });
+      setElapsedSeconds((prev) => {
+        const next = new Map(prev);
+        next.delete(reviewId);
+        return next;
+      });
+    };
+    window.electronAPI.onReviewCompleted((reviewId) => {
+      clearReview(reviewId);
       void window.electronAPI.listReviews().then(setHistory);
     });
     window.electronAPI.onReviewFailed((reviewId) => {
-      setReviewPhases((prev) => {
-        const next = new Map(prev);
-        next.delete(reviewId);
-        return next;
-      });
+      clearReview(reviewId);
       void window.electronAPI.listReviews().then(setHistory);
     });
     return () => {
       window.electronAPI.offReviewPhase();
+      window.electronAPI.offReviewProgress();
+      window.electronAPI.offReviewStats();
       window.electronAPI.offReviewCompleted();
       window.electronAPI.offReviewFailed();
     };
@@ -204,6 +242,39 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     if (typeof authStatus !== 'object') return;
     fetchPendingReviews();
   }, [authStatus, fetchPendingReviews]);
+
+  // Tick elapsed seconds for active generations
+  useEffect(() => {
+    if (generationStartTimes.size === 0) return;
+    const id = setInterval(() => {
+      setElapsedSeconds((prev) => {
+        const next = new Map(prev);
+        for (const [reviewId, startTime] of generationStartTimes) {
+          next.set(reviewId, Math.floor((Date.now() - startTime) / 1000));
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [generationStartTimes]);
+
+  // Background-check freshness for open PRs in history
+  useEffect(() => {
+    if (prGroups.length === 0) return;
+    for (const group of prGroups) {
+      if (group.latestReview.prState !== 'open') continue;
+      const sha = group.latestReview.prHeadSha;
+      if (!sha) continue;
+      void window.electronAPI
+        .checkPrFreshness(group.prUrl, sha)
+        .then((result) => {
+          if (result.status !== 'current') {
+            setOutdatedPrs((prev) => new Set(prev).add(group.prUrl));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [prGroups]);
 
   const savePrefs = useCallback(
     (overrides?: Partial<Preferences>) => {
@@ -273,7 +344,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   async function doStartReview(excludedFiles: string[]) {
     setSubmitting(true);
     try {
-      await window.electronAPI.startReview({
+      const result = await window.electronAPI.startReview({
         prUrl: prUrl.trim(),
         provider,
         model,
@@ -285,6 +356,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
         webResearch,
         excludedFiles: excludedFiles.length > 0 ? excludedFiles : undefined,
       });
+      setGenerationStartTimes((prev) => new Map(prev).set(result.reviewId, Date.now()));
       const updated = await window.electronAPI.listReviews();
       setHistory(updated);
       setPrUrl('');
@@ -692,6 +764,11 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                       const hasMultiple = group.reviews.length > 1;
                       const isExpanded = expandedPRs.has(group.prUrl);
                       const isClickable = latestStatus === 'completed';
+                      const latestId = group.latestReview.id;
+                      const elapsed = elapsedSeconds.get(latestId) ?? 0;
+                      const bytes = reviewBytes.get(latestId);
+                      const isOutdated = outdatedPrs.has(group.prUrl);
+                      const prState = group.latestReview.prState;
 
                       return (
                         <li key={group.prUrl}>
@@ -721,7 +798,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                               )}
                             </div>
                             <button
-                              onClick={() => isClickable && handleLoadFromHistory(group.latestReview.id)}
+                              onClick={() => isClickable && handleLoadFromHistory(latestId)}
                               className={`flex-1 min-w-0 flex items-center gap-3 text-left ${!isClickable ? 'cursor-default' : ''}`}
                               disabled={!isClickable}
                             >
@@ -731,12 +808,55 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                                   {group.repoRef} · {group.author} · {timeAgo(group.latestReview.savedAt)}
                                   {hasMultiple && ` · ${group.reviews.length} reviews`}
                                 </span>
+                                {latestStatus === 'generating' && bytes && bytes.inputBytes > 0 && (
+                                  <span className="text-xs text-muted-foreground/60 truncate">
+                                    ↑{formatBytes(bytes.inputBytes)} ↓{formatBytes(bytes.outputBytes)}
+                                  </span>
+                                )}
                               </div>
                             </button>
+                            {prState && (
+                              <>
+                                {prState === 'open' && !isOutdated && (
+                                  <Badge
+                                    variant="outline"
+                                    className="shrink-0 text-xs border-green-500/30 text-green-400"
+                                  >
+                                    <GitPullRequest className="h-3 w-3 mr-1" />
+                                    Open
+                                  </Badge>
+                                )}
+                                {prState === 'open' && isOutdated && (
+                                  <Badge
+                                    variant="outline"
+                                    className="shrink-0 text-xs border-yellow-500/30 text-yellow-400"
+                                  >
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                    Outdated
+                                  </Badge>
+                                )}
+                                {prState === 'merged' && (
+                                  <Badge
+                                    variant="outline"
+                                    className="shrink-0 text-xs border-purple-500/30 text-purple-400"
+                                  >
+                                    <GitMerge className="h-3 w-3 mr-1" />
+                                    Merged
+                                  </Badge>
+                                )}
+                                {prState === 'closed' && (
+                                  <Badge variant="outline" className="shrink-0 text-xs border-red-500/30 text-red-400">
+                                    <GitPullRequestClosed className="h-3 w-3 mr-1" />
+                                    Closed
+                                  </Badge>
+                                )}
+                              </>
+                            )}
                             {latestStatus === 'generating' && (
                               <Badge variant="outline" className="shrink-0 text-xs border-blue-500/30 text-blue-400">
                                 <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                {reviewPhases.get(group.latestReview.id) ?? 'Starting'}
+                                {reviewPhases.get(latestId) ?? 'Starting'}
+                                {elapsed > 0 && ` · ${formatDuration(elapsed * 1000)}`}
                               </Badge>
                             )}
                             {latestStatus === 'failed' && (
@@ -755,11 +875,24 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                               </Badge>
                             )}
                             <div className="shrink-0 flex items-center gap-0.5">
-                              {!hasMultiple && latestStatus === 'failed' && (
+                              {!hasMultiple && latestStatus === 'generating' && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    void window.electronAPI.openReviewPrompt(group.latestReview.id);
+                                    void window.electronAPI.cancelReview(latestId);
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity px-1"
+                                  aria-label="Cancel review"
+                                  title="Cancel this review"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              {!hasMultiple && latestStatus !== 'generating' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void window.electronAPI.openReviewPrompt(latestId);
                                   }}
                                   className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity px-1"
                                   aria-label="View prompt"
@@ -770,7 +903,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                               )}
                               {!hasMultiple && latestStatus !== 'generating' && (
                                 <button
-                                  onClick={(e) => handleDeleteFromHistory(e, group.latestReview.id)}
+                                  onClick={(e) => handleDeleteFromHistory(e, latestId)}
                                   className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity px-1"
                                   aria-label="Delete"
                                 >
@@ -786,6 +919,8 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                                 const reviewStatus = getEntryStatus(review);
                                 const reviewRisk = riskConfig[review.riskLevel];
                                 const reviewClickable = reviewStatus === 'completed';
+                                const reviewElapsed = elapsedSeconds.get(review.id) ?? 0;
+                                const reviewBytesEntry = reviewBytes.get(review.id);
                                 return (
                                   <li key={review.id}>
                                     <button
@@ -801,6 +936,14 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                                           {' · '}
                                           {timeAgo(review.savedAt)}
                                         </span>
+                                        {reviewStatus === 'generating' &&
+                                          reviewBytesEntry &&
+                                          reviewBytesEntry.inputBytes > 0 && (
+                                            <span className="text-xs text-muted-foreground/60 truncate">
+                                              ↑{formatBytes(reviewBytesEntry.inputBytes)} ↓
+                                              {formatBytes(reviewBytesEntry.outputBytes)}
+                                            </span>
+                                          )}
                                       </div>
                                       {reviewStatus === 'generating' && (
                                         <Badge
@@ -809,6 +952,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                                         >
                                           <Loader2 className="h-3 w-3 animate-spin mr-1" />
                                           {reviewPhases.get(review.id) ?? 'Starting'}
+                                          {reviewElapsed > 0 && ` · ${formatDuration(reviewElapsed * 1000)}`}
                                         </Badge>
                                       )}
                                       {reviewStatus === 'failed' && (
@@ -829,7 +973,20 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                                           {reviewRisk.label}
                                         </Badge>
                                       )}
-                                      {reviewStatus === 'failed' && (
+                                      {reviewStatus === 'generating' && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void window.electronAPI.cancelReview(review.id);
+                                          }}
+                                          className="shrink-0 opacity-0 group-hover/review:opacity-100 text-muted-foreground hover:text-destructive transition-opacity px-1"
+                                          aria-label="Cancel review"
+                                          title="Cancel this review"
+                                        >
+                                          <X className="h-3.5 w-3.5" />
+                                        </button>
+                                      )}
+                                      {reviewStatus !== 'generating' && (
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();

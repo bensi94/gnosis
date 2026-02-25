@@ -16,6 +16,7 @@ import type {
 
 contextBridge.exposeInMainWorld('electronAPI', {
   startReview: (req: GenerateReviewRequest): Promise<StartReviewResult> => ipcRenderer.invoke('start-review', req),
+  cancelReview: (reviewId: string): Promise<void> => ipcRenderer.invoke('cancel-review', reviewId),
   getConfig: (): Promise<{ githubToken: string | null }> => ipcRenderer.invoke('get-config'),
   startOAuth: (): Promise<void> => ipcRenderer.invoke('start-oauth'),
   getAuthState: (): Promise<{ authenticated: boolean; login: string | null }> => ipcRenderer.invoke('get-auth-state'),
@@ -63,6 +64,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   offReviewFailed: (): void => {
     ipcRenderer.removeAllListeners('review-failed');
+  },
+  onReviewStats: (callback: (reviewId: string, inputBytes: number) => void): void => {
+    ipcRenderer.on('review-stats', (_event, { reviewId, inputBytes }: { reviewId: string; inputBytes: number }) =>
+      callback(reviewId, inputBytes)
+    );
+  },
+  offReviewStats: (): void => {
+    ipcRenderer.removeAllListeners('review-stats');
   },
   onReviewNavigate: (callback: (reviewId: string) => void): void => {
     ipcRenderer.on('review-navigate', (_event, { reviewId }: { reviewId: string }) => callback(reviewId));
