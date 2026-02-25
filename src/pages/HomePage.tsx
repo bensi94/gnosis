@@ -475,286 +475,301 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
           <div
             className={`grid gap-6 items-start ${prGroups.length > 0 ? 'grid-cols-[420px_1fr]' : 'max-w-lg mx-auto w-full'}`}
           >
-            {/* PR form */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex justify-end items-center gap-2 mb-4">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+            {/* Left column: account card + form card */}
+            <div className="flex flex-col gap-4">
+              {/* Account card */}
+              <Card>
+                <CardContent className="py-3 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
                     <CircleCheck className="h-3 w-3" />@{(authStatus as { login: string }).login}
                   </span>
-                  <button
-                    onClick={() => setSettingsOpen(true)}
-                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-                    aria-label="Settings"
-                  >
-                    <Settings className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={handleSignOut}
-                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-                  >
-                    <LogOut className="h-3 w-3" />
-                    Sign out
-                  </button>
-                </div>
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="pr-url" className="text-sm font-medium flex items-center gap-1.5">
-                      <GitHubIcon className="h-3.5 w-3.5" />
-                      Pull Request URL
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        id="pr-url"
-                        type="url"
-                        placeholder="https://github.com/owner/repo/pull/123"
-                        value={prUrl}
-                        onChange={(e) => setPrUrl(e.target.value)}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        required
-                      />
-                      <Button type="button" variant="outline" onClick={() => setPrPickerOpen(true)} className="gap-1.5">
-                        <Search className="h-3.5 w-3.5" />
-                        Browse
-                      </Button>
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setSettingsOpen(true)}
+                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                      aria-label="Settings"
+                    >
+                      <Settings className="h-3 w-3" />
+                      Settings
+                    </button>
+                    <button
+                      onClick={handleSignOut}
+                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    >
+                      <LogOut className="h-3 w-3" />
+                      Sign out
+                    </button>
                   </div>
-                  <PRPickerDialog open={prPickerOpen} onOpenChange={setPrPickerOpen} onSelect={setPrUrl} />
-                  <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-                  <FilePickerDialog
-                    open={filePickerOpen}
-                    onOpenChange={setFilePickerOpen}
-                    prUrl={prUrl.trim()}
-                    onConfirm={(excluded) => {
-                      setFilePickerOpen(false);
-                      void doStartReview(excluded);
-                    }}
-                  />
+                </CardContent>
+              </Card>
 
-                  <Dialog open={cliNotFound !== null} onOpenChange={() => setCliNotFound(null)}>
-                    <DialogContent className="bg-card sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>
-                          {cliNotFound?.provider === 'claude' ? 'Claude' : 'Gemini'} CLI not found
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="flex flex-col gap-3 text-sm text-muted-foreground">
-                        <p>
-                          The {cliNotFound?.provider === 'claude' ? 'Claude' : 'Gemini'} CLI could not be found on your
-                          system. Gnosis uses the CLI to generate reviews.
-                        </p>
-                        <p>
-                          {cliNotFound?.provider === 'claude'
-                            ? 'Install it from claude.ai/code and authenticate with `claude auth`.'
-                            : 'Install it from github.com/google-gemini/gemini-cli and authenticate.'}
-                        </p>
-                        <p>
-                          If the CLI is already installed but not detected, you can set the path manually in Settings.
-                        </p>
-                      </div>
-                      <div className="flex gap-2 justify-end pt-2">
-                        <Button variant="outline" onClick={() => setCliNotFound(null)}>
-                          Dismiss
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setCliNotFound(null);
-                            setSettingsOpen(true);
-                          }}
-                        >
-                          Open Settings
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  {/* Pending review requests */}
-                  <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Pending reviews
+              {/* PR form */}
+              <Card>
+                <CardContent className="pt-6">
+                  <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label htmlFor="pr-url" className="text-sm font-medium flex items-center gap-1.5">
+                        <GitHubIcon className="h-3.5 w-3.5" />
+                        Pull Request URL
                       </label>
-                      <button
-                        type="button"
-                        onClick={fetchPendingReviews}
-                        disabled={pendingLoading}
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
-                        aria-label="Reload pending reviews"
-                      >
-                        <RefreshCw className={`h-3 w-3 ${pendingLoading ? 'animate-spin' : ''}`} />
-                      </button>
-                    </div>
-                    {pendingLoading ? (
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-1">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Loading…
+                      <div className="flex gap-2">
+                        <input
+                          id="pr-url"
+                          type="url"
+                          placeholder="https://github.com/owner/repo/pull/123"
+                          value={prUrl}
+                          onChange={(e) => setPrUrl(e.target.value)}
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          required
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setPrPickerOpen(true)}
+                          className="gap-1.5"
+                        >
+                          <Search className="h-3.5 w-3.5" />
+                          Browse
+                        </Button>
                       </div>
-                    ) : pendingReviews.length === 0 ? (
-                      <p className="text-xs text-muted-foreground py-1">No pending reviews</p>
-                    ) : (
-                      <>
-                        {pendingReviews.slice(0, 10).map((pr) => (
-                          <button
-                            key={pr.url}
-                            type="button"
-                            onClick={() => setPrUrl(pr.url)}
-                            className="flex items-center gap-2 text-left rounded-md px-2 py-1.5 hover:bg-muted/50 transition-colors min-w-0"
+                    </div>
+                    <PRPickerDialog open={prPickerOpen} onOpenChange={setPrPickerOpen} onSelect={setPrUrl} />
+                    <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+                    <FilePickerDialog
+                      open={filePickerOpen}
+                      onOpenChange={setFilePickerOpen}
+                      prUrl={prUrl.trim()}
+                      onConfirm={(excluded) => {
+                        setFilePickerOpen(false);
+                        void doStartReview(excluded);
+                      }}
+                    />
+
+                    <Dialog open={cliNotFound !== null} onOpenChange={() => setCliNotFound(null)}>
+                      <DialogContent className="bg-card sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>
+                            {cliNotFound?.provider === 'claude' ? 'Claude' : 'Gemini'} CLI not found
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="flex flex-col gap-3 text-sm text-muted-foreground">
+                          <p>
+                            The {cliNotFound?.provider === 'claude' ? 'Claude' : 'Gemini'} CLI could not be found on
+                            your system. Gnosis uses the CLI to generate reviews.
+                          </p>
+                          <p>
+                            {cliNotFound?.provider === 'claude'
+                              ? 'Install it from claude.ai/code and authenticate with `claude auth`.'
+                              : 'Install it from github.com/google-gemini/gemini-cli and authenticate.'}
+                          </p>
+                          <p>
+                            If the CLI is already installed but not detected, you can set the path manually in Settings.
+                          </p>
+                        </div>
+                        <div className="flex gap-2 justify-end pt-2">
+                          <Button variant="outline" onClick={() => setCliNotFound(null)}>
+                            Dismiss
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setCliNotFound(null);
+                              setSettingsOpen(true);
+                            }}
                           >
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              {pr.repoName} #{pr.number}
-                            </span>
-                            <span className="text-sm truncate">{pr.title}</span>
+                            Open Settings
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Pending review requests */}
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Pending reviews
+                        </label>
+                        <button
+                          type="button"
+                          onClick={fetchPendingReviews}
+                          disabled={pendingLoading}
+                          className="text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+                          aria-label="Reload pending reviews"
+                        >
+                          <RefreshCw className={`h-3 w-3 ${pendingLoading ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
+                      {pendingLoading ? (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading…
+                        </div>
+                      ) : pendingReviews.length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-1">No pending reviews</p>
+                      ) : (
+                        <>
+                          {pendingReviews.slice(0, 10).map((pr) => (
+                            <button
+                              key={pr.url}
+                              type="button"
+                              onClick={() => setPrUrl(pr.url)}
+                              className="flex items-center gap-2 text-left rounded-md px-2 py-1.5 hover:bg-muted/50 transition-colors min-w-0"
+                            >
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                {pr.repoName} #{pr.number}
+                              </span>
+                              <span className="text-sm truncate">{pr.title}</span>
+                            </button>
+                          ))}
+                          {pendingReviews.length > 10 && (
+                            <button
+                              type="button"
+                              onClick={() => setPrPickerOpen(true)}
+                              className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 text-left"
+                            >
+                              Show {pendingReviews.length - 10} more…
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label htmlFor="instructions" className="text-sm font-medium flex items-center gap-1.5">
+                        <SlidersHorizontal className="h-3.5 w-3.5" />
+                        Instructions <span className="text-muted-foreground font-normal">(optional)</span>
+                      </label>
+                      <textarea
+                        id="instructions"
+                        rows={5}
+                        placeholder="e.g. focus on performance, flag any security concerns, explain the auth flow"
+                        value={instructions}
+                        onChange={(e) => setInstructions(e.target.value)}
+                        onBlur={() => savePrefs()}
+                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium">Provider</label>
+                      <div className="flex gap-2">
+                        {(['claude', 'gemini'] as const).map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => handleProviderChange(p)}
+                            className={`flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                              provider === p
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                            }`}
+                          >
+                            {PROVIDERS[p].label}
                           </button>
                         ))}
-                        {pendingReviews.length > 10 && (
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium">Model</label>
+                      <div className="flex flex-wrap gap-2">
+                        {PROVIDERS[provider].models.map((m) => (
                           <button
+                            key={m.id}
                             type="button"
-                            onClick={() => setPrPickerOpen(true)}
-                            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 text-left"
+                            onClick={() => setModel(m.id)}
+                            className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                              model === m.id
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                            }`}
                           >
-                            Show {pendingReviews.length - 10} more…
+                            {m.label}
                           </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="instructions" className="text-sm font-medium flex items-center gap-1.5">
-                      <SlidersHorizontal className="h-3.5 w-3.5" />
-                      Instructions <span className="text-muted-foreground font-normal">(optional)</span>
-                    </label>
-                    <textarea
-                      id="instructions"
-                      rows={5}
-                      placeholder="e.g. focus on performance, flag any security concerns, explain the auth flow"
-                      value={instructions}
-                      onChange={(e) => setInstructions(e.target.value)}
-                      onBlur={() => savePrefs()}
-                      className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium">Provider</label>
-                    <div className="flex gap-2">
-                      {(['claude', 'gemini'] as const).map((p) => (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => handleProviderChange(p)}
-                          className={`flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                            provider === p
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                          }`}
-                        >
-                          {PROVIDERS[p].label}
-                        </button>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium">Model</label>
-                    <div className="flex flex-wrap gap-2">
-                      {PROVIDERS[provider].models.map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => setModel(m.id)}
-                          className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                            model === m.id
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-input bg-transparent text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                          }`}
-                        >
-                          {m.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <ToggleSwitch
-                    id="include-all-files"
-                    label="Include all files"
-                    description={
-                      includeAllFiles
-                        ? 'All changed files included in the review'
-                        : 'You will choose which files to include'
-                    }
-                    checked={includeAllFiles}
-                    onToggle={() => setIncludeAllFiles((v) => !v)}
-                  />
-
-                  {provider === 'claude' && (
                     <ToggleSwitch
-                      id="thinking"
-                      label="Extended thinking"
-                      description={thinking ? 'Deeper reasoning · slower' : 'Standard speed'}
-                      checked={thinking}
-                      onToggle={() => setThinking((t) => !t)}
+                      id="include-all-files"
+                      label="Include all files"
+                      description={
+                        includeAllFiles
+                          ? 'All changed files included in the review'
+                          : 'You will choose which files to include'
+                      }
+                      checked={includeAllFiles}
+                      onToggle={() => setIncludeAllFiles((v) => !v)}
                     />
-                  )}
 
-                  <ToggleSwitch
-                    id="signal-boost"
-                    label="Signal boost"
-                    description="Skip trivial changes, focus on design and complexity"
-                    checked={signalBoost}
-                    onToggle={() => setSignalBoost((s) => !s)}
-                    badge="Experimental"
-                  />
-
-                  <ToggleSwitch
-                    id="smart-imports"
-                    label="Smart imports"
-                    description="Use AI to find related files across all languages"
-                    checked={smartImports}
-                    onToggle={() => setSmartImports((s) => !s)}
-                    badge="Experimental"
-                  />
-
-                  <ToggleSwitch
-                    id="review-suggestions"
-                    label="Review suggestions"
-                    description="Generate 'What to check' for each slide"
-                    checked={reviewSuggestions}
-                    onToggle={() => setReviewSuggestions((r) => !r)}
-                  />
-
-                  {provider === 'claude' && (
-                    <ToggleSwitch
-                      id="web-research"
-                      label="Web research"
-                      description="Search for framework docs and best practices (slower)"
-                      checked={webResearch}
-                      onToggle={() => setWebResearch((w) => !w)}
-                    />
-                  )}
-
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <Button type="submit" className="w-full gap-2" disabled={submitting}>
-                    {submitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Starting…
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4" />
-                        Generate Review
-                      </>
+                    {provider === 'claude' && (
+                      <ToggleSwitch
+                        id="thinking"
+                        label="Extended thinking"
+                        description={thinking ? 'Deeper reasoning · slower' : 'Standard speed'}
+                        checked={thinking}
+                        onToggle={() => setThinking((t) => !t)}
+                      />
                     )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+
+                    <ToggleSwitch
+                      id="signal-boost"
+                      label="Signal boost"
+                      description="Skip trivial changes, focus on design and complexity"
+                      checked={signalBoost}
+                      onToggle={() => setSignalBoost((s) => !s)}
+                      badge="Experimental"
+                    />
+
+                    <ToggleSwitch
+                      id="smart-imports"
+                      label="Smart imports"
+                      description="Use AI to find related files across all languages"
+                      checked={smartImports}
+                      onToggle={() => setSmartImports((s) => !s)}
+                      badge="Experimental"
+                    />
+
+                    <ToggleSwitch
+                      id="review-suggestions"
+                      label="Review suggestions"
+                      description="Generate 'What to check' for each slide"
+                      checked={reviewSuggestions}
+                      onToggle={() => setReviewSuggestions((r) => !r)}
+                    />
+
+                    {provider === 'claude' && (
+                      <ToggleSwitch
+                        id="web-research"
+                        label="Web research"
+                        description="Search for framework docs and best practices (slower)"
+                        checked={webResearch}
+                        onToggle={() => setWebResearch((w) => !w)}
+                      />
+                    )}
+
+                    {error && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    <Button type="submit" className="w-full gap-2" disabled={submitting}>
+                      {submitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Starting…
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4" />
+                          Generate Review
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
 
             {/* History */}
             {prGroups.length > 0 && (
