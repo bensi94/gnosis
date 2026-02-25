@@ -50,6 +50,7 @@ export function detectBinaryPath(name: string, extraCandidates: string[] = []): 
   const candidates = [
     `/usr/local/bin/${name}`,
     `/opt/homebrew/bin/${name}`,
+    `${home}/.local/bin/${name}`,
     `${home}/.npm-global/bin/${name}`,
     `${home}/.nvm/current/bin/${name}`,
     ...extraCandidates,

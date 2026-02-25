@@ -672,12 +672,12 @@ ipcMain.handle('save-preferences', (_event, prefs: Preferences) => {
 });
 
 ipcMain.handle('detect-binary-path', (_event, name: string) => {
-  const extra = name === 'claude' ? [`${os.homedir()}/.volta/bin/claude`] : [];
+  const extra = name === 'claude' ? [`${os.homedir()}/.volta/bin/claude`, `${os.homedir()}/.local/bin/claude`] : [];
   return detectBinaryPath(name, extra);
 });
 
 ipcMain.handle('check-cli-installed', (_event, provider: string) => {
-  const extra = provider === 'claude' ? [`${os.homedir()}/.volta/bin/claude`] : [];
+  const extra = provider === 'claude' ? [`${os.homedir()}/.volta/bin/claude`, `${os.homedir()}/.local/bin/claude`] : [];
   const resolved = resolveBinaryPath(provider, extra);
   const installed = path.isAbsolute(resolved) && fs.existsSync(resolved);
   return { installed, resolvedPath: resolved };
