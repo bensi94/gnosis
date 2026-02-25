@@ -137,6 +137,16 @@ async function fetchGitHubLogin(token: string): Promise<string> {
   return data.login ?? 'unknown';
 }
 
+async function validateAndFetchLogin(token: string): Promise<string> {
+  const res = await fetch('https://api.github.com/user', {
+    headers: { Authorization: `token ${token}`, 'User-Agent': 'Gnosis-App' },
+  });
+  if (!res.ok) throw new Error(`Invalid token (GitHub returned ${res.status})`);
+  const data = (await res.json()) as { login?: string };
+  if (!data.login) throw new Error('Token validated but could not retrieve GitHub username');
+  return data.login;
+}
+
 function generatePkce(): { verifier: string; challenge: string } {
   const verifier = crypto.randomBytes(32).toString('base64url');
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
@@ -632,6 +642,16 @@ ipcMain.handle('get-config', () => {
 
 ipcMain.handle('start-oauth', async () => {
   await runOAuthFlow();
+});
+
+ipcMain.handle('save-pat', async (_event, token: string) => {
+  const trimmed = token.trim();
+  if (!trimmed) throw new Error('Token must not be empty');
+  const login = await validateAndFetchLogin(trimmed);
+  persistToken(trimmed);
+  cachedToken = trimmed;
+  cachedLogin = login;
+  return login;
 });
 
 ipcMain.handle('get-auth-state', async () => {

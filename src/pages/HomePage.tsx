@@ -152,6 +152,10 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [livePrStates, setLivePrStates] = useState<
     Map<string, { prState: 'open' | 'merged' | 'closed'; headSha: string }>
   >(new Map());
+  const [patExpanded, setPatExpanded] = useState(false);
+  const [patToken, setPatToken] = useState('');
+  const [patError, setPatError] = useState<string | null>(null);
+  const [patConnecting, setPatConnecting] = useState(false);
 
   const prGroups = useMemo(() => groupReviewsByPR(history), [history]);
 
@@ -335,6 +339,23 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     }
   }
 
+  async function handleConnectPat() {
+    const trimmed = patToken.trim();
+    if (!trimmed || patConnecting) return;
+    setPatError(null);
+    setPatConnecting(true);
+    try {
+      const login = await window.electronAPI.savePat(trimmed);
+      setAuthStatus({ login });
+      setPatToken('');
+      setPatExpanded(false);
+    } catch (err) {
+      setPatError(err instanceof Error ? err.message : 'Failed to connect token.');
+    } finally {
+      setPatConnecting(false);
+    }
+  }
+
   async function handleSignOut() {
     await window.electronAPI.signOut();
     setAuthStatus('unauthenticated');
@@ -457,6 +478,60 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                   <GitHubIcon className="h-4 w-4" />
                   Sign in with GitHub
                 </Button>
+                <div className="w-full border-t" />
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => {
+                    setPatExpanded((v) => !v);
+                    setPatError(null);
+                  }}
+                >
+                  {patExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  Use a Personal Access Token
+                </button>
+                {patExpanded && (
+                  <div className="w-full flex flex-col gap-2 text-left">
+                    <p className="text-xs text-muted-foreground">
+                      Create a token with <code className="font-mono">repo</code> scope at{' '}
+                      <button
+                        type="button"
+                        className="underline hover:text-foreground"
+                        onClick={() =>
+                          void window.electronAPI.openExternal(
+                            'https://github.com/settings/tokens/new?scopes=repo&description=Gnosis'
+                          )
+                        }
+                      >
+                        github.com/settings/tokens
+                      </button>
+                      , then paste it below.
+                    </p>
+                    <input
+                      type="password"
+                      placeholder="ghp_…"
+                      value={patToken}
+                      onChange={(e) => setPatToken(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void handleConnectPat();
+                      }}
+                      className="w-full rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    {patError && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{patError}</AlertDescription>
+                      </Alert>
+                    )}
+                    <Button
+                      onClick={() => void handleConnectPat()}
+                      disabled={!patToken.trim() || patConnecting}
+                      className="w-full"
+                      size="sm"
+                    >
+                      {patConnecting ? 'Connecting…' : 'Connect'}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </>

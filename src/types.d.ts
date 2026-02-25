@@ -22,6 +22,7 @@ declare global {
       startOAuth: () => Promise<void>;
       getAuthState: () => Promise<{ authenticated: boolean; login: string | null }>;
       signOut: () => Promise<void>;
+      savePat: (token: string) => Promise<string>;
       listReviews: () => Promise<ReviewHistoryEntry[]>;
       loadReview: (id: string) => Promise<ReviewGuide>;
       deleteReview: (id: string) => Promise<void>;
