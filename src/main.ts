@@ -402,14 +402,14 @@ void app.whenReady().then(() => {
   createWindow();
   setupAutoUpdater();
 
-  // GitHub release polling only needed on platforms without native auto-update (Linux, dev)
-  if (process.platform === 'linux' || !app.isPackaged) {
+  // GitHub release polling only needed on Linux (no native auto-update)
+  if (process.platform === 'linux') {
     startUpdateChecks();
   }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    if (!updateInterval && (process.platform === 'linux' || !app.isPackaged)) startUpdateChecks();
+    if (!updateInterval && process.platform === 'linux') startUpdateChecks();
   });
 });
 

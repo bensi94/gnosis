@@ -12,8 +12,7 @@ export function UpdateBanner() {
     return () => window.electronAPI.offUpdateAvailable();
   }, []);
 
-  // On platforms with auto-update, the update is handled silently via
-  // native notification + install-on-exit. No in-app banner needed.
+  // Banner is only for Linux — macOS/Windows use native Squirrel auto-update.
   if (!update || supportsAutoUpdate) return null;
 
   const { version, releaseUrl } = update;
