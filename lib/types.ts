@@ -143,6 +143,8 @@ export interface ReviewHistoryEntry {
   model?: ModelId;
   generationDurationMs?: number;
   savedAt: string; // ISO date string
+  prState?: 'open' | 'merged' | 'closed';
+  prHeadSha?: string;
 }
 
 export interface StartReviewResult {
@@ -262,6 +264,7 @@ export interface PrMetadata {
   headBranch: string;
   headSha: string;
   merged: boolean;
+  state: 'open' | 'closed';
   createdAt: string;
   updatedAt: string;
   url: string;

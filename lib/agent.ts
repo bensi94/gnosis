@@ -178,7 +178,8 @@ export async function generateReviewGuide(
   reviewSuggestions: boolean = true,
   webResearch: boolean = false,
   onToolUse?: (toolName: string) => void,
-  onPromptReady?: (system: string, userMessage: string) => void
+  onPromptReady?: (system: string, userMessage: string) => void,
+  signal?: AbortSignal
 ): Promise<AIReviewGuide> {
   const provider = getProvider(providerName);
 
@@ -223,6 +224,7 @@ export async function generateReviewGuide(
       onToolUse,
       mcpConfigPath,
       allowedTools,
+      signal,
     });
     console.log('[agent] Generation complete, parsing response...');
 

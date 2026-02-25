@@ -17,6 +17,7 @@ declare global {
   interface Window {
     electronAPI: {
       startReview: (req: GenerateReviewRequest) => Promise<StartReviewResult>;
+      cancelReview: (reviewId: string) => Promise<void>;
       getConfig: () => Promise<{ githubToken: string | null }>;
       startOAuth: () => Promise<void>;
       getAuthState: () => Promise<{ authenticated: boolean; login: string | null }>;
@@ -35,6 +36,8 @@ declare global {
       offReviewCompleted: () => void;
       onReviewFailed: (callback: (reviewId: string, error: string) => void) => void;
       offReviewFailed: () => void;
+      onReviewStats: (callback: (reviewId: string, inputBytes: number) => void) => void;
+      offReviewStats: () => void;
       onReviewNavigate: (callback: (reviewId: string) => void) => void;
       offReviewNavigate: () => void;
       sendSlideChat: (req: SendSlideChatRequest) => Promise<string>;
@@ -57,6 +60,7 @@ declare global {
       openReviewPrompt: (id: string) => Promise<void>;
       detectBinaryPath: (name: string) => Promise<string>;
       checkCliInstalled: (provider: string) => Promise<{ installed: boolean; resolvedPath: string }>;
+      getPrState: (prUrl: string) => Promise<{ prState: 'open' | 'merged' | 'closed'; headSha: string }>;
       getPrFiles: (prUrl: string) => Promise<ChangedFile[]>;
       platform: NodeJS.Platform;
       isPackaged: boolean;

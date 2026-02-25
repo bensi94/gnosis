@@ -116,6 +116,8 @@ export interface StreamingCliOptions {
   installHint: string;
   /** Custom error handler for non-zero exit codes. Return an Error or undefined to use default. */
   handleExitError?: (stderr: string) => Error | undefined;
+  /** When aborted, kills the child process and rejects with a cancellation error. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -126,6 +128,13 @@ export function spawnCliStreaming(opts: StreamingCliOptions): Promise<void> {
   return new Promise((resolve, reject) => {
     const proc = spawn(opts.binPath, opts.args, { env: opts.env });
     const tag = `[${opts.cliName}]`;
+
+    if (opts.signal) {
+      const onAbort = () => {
+        proc.kill();
+      };
+      opts.signal.addEventListener('abort', onAbort, { once: true });
+    }
 
     proc.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'ENOENT') {
@@ -167,6 +176,10 @@ export function spawnCliStreaming(opts: StreamingCliOptions): Promise<void> {
     proc.on('close', (code: number | null) => {
       debugStream.end();
       if (lineBuffer.trim()) opts.processLine(lineBuffer);
+      if (opts.signal?.aborted) {
+        reject(new Error('GNOSIS_CANCELLED'));
+        return;
+      }
       if (code === 0) {
         const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
         console.log(`${tag} CLI finished in ${elapsed}s -> ${debugPath}`);

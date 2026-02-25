@@ -476,7 +476,15 @@ function readReviewsIndex(): ReviewHistoryEntry[] {
 
 const activeGenerations = new Map<string, { abortController?: AbortController }>();
 
-function createPendingHistoryEntry(id: string, prTitle: string, prUrl: string, author: string, model?: ModelId): void {
+function createPendingHistoryEntry(
+  id: string,
+  prTitle: string,
+  prUrl: string,
+  author: string,
+  model?: ModelId,
+  prState?: 'open' | 'merged' | 'closed',
+  prHeadSha?: string
+): void {
   ensureReviewsDir();
   const entry: ReviewHistoryEntry = {
     id,
@@ -487,6 +495,8 @@ function createPendingHistoryEntry(id: string, prTitle: string, prUrl: string, a
     status: 'generating',
     model,
     savedAt: new Date().toISOString(),
+    prState,
+    prHeadSha,
   };
   const index = readReviewsIndex();
   index.unshift(entry);
@@ -798,6 +808,18 @@ ipcMain.handle('get-pr-status', async (_event, prUrl: string): Promise<PrStatus>
   };
 });
 
+ipcMain.handle(
+  'get-pr-state',
+  async (_event, prUrl: string): Promise<{ prState: 'open' | 'merged' | 'closed'; headSha: string }> => {
+    const token = getResolvedToken();
+    const octokit = new Octokit({ auth: token ?? undefined });
+    const { owner, repo, pullNumber } = parsePrUrl(prUrl);
+    const prData = await getPrMetadata(octokit, owner, repo, pullNumber);
+    const prState = prData.merged ? 'merged' : prData.state === 'open' ? 'open' : 'closed';
+    return { prState, headSha: prData.headSha };
+  }
+);
+
 ipcMain.handle('get-pr-files', async (_event, prUrl: string): Promise<ChangedFile[]> => {
   const token = getResolvedToken();
   const octokit = new Octokit({ auth: token ?? undefined });
@@ -810,7 +832,8 @@ ipcMain.handle('get-pr-files', async (_event, prUrl: string): Promise<ChangedFil
 async function runBackgroundGeneration(
   reviewId: string,
   request: GenerateReviewRequest,
-  prData: Awaited<ReturnType<typeof getPrMetadata>>
+  prData: Awaited<ReturnType<typeof getPrMetadata>>,
+  signal: AbortSignal
 ): Promise<void> {
   const { prUrl, provider, model, instructions, thinking, signalBoost, smartImports, reviewSuggestions, webResearch } =
     request;
@@ -952,6 +975,10 @@ async function runBackgroundGeneration(
         webResearch ?? false,
         (toolName) => broadcastToAllWindows('review-tool-use', { reviewId, toolName }),
         (system, userMessage) => {
+          broadcastToAllWindows('review-stats', {
+            reviewId,
+            inputBytes: system.length + userMessage.length,
+          });
           try {
             ensureReviewsDir();
             fs.writeFileSync(
@@ -961,13 +988,27 @@ async function runBackgroundGeneration(
           } catch {
             // Best-effort — don't fail the review if prompt save fails
           }
-        }
+        },
+        signal
       );
     } finally {
       if (mcpConfigPath) cleanupMcpConfig(mcpConfigPath);
     }
 
     const generationDurationMs = Date.now() - generationStart;
+
+    // Append raw model response to prompt file (best-effort)
+    try {
+      const promptPath = path.join(getReviewsDir(), `${reviewId}-prompt.md`);
+      if (fs.existsSync(promptPath)) {
+        fs.appendFileSync(
+          promptPath,
+          `\n---\n\n# Model Response\n\n\`\`\`json\n${JSON.stringify(aiResult, null, 2)}\n\`\`\`\n`
+        );
+      }
+    } catch {
+      // Best-effort
+    }
 
     // Resolve hunk IDs → real DiffHunk objects
     const hunkMap = new Map(indexedHunks.map((h) => [h.id, h]));
@@ -1129,8 +1170,9 @@ async function runBackgroundGeneration(
 
     console.log(`[main] Review ${reviewId} completed in ${formatMs(generationDurationMs)}`);
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error(`[main] Review ${reviewId} failed:`, errorMessage);
+    const isCancelled = err instanceof Error && err.message === 'GNOSIS_CANCELLED';
+    const errorMessage = isCancelled ? 'Cancelled' : err instanceof Error ? err.message : 'Unknown error';
+    if (!isCancelled) console.error(`[main] Review ${reviewId} failed:`, errorMessage);
 
     updateHistoryEntry(reviewId, {
       status: 'failed',
@@ -1157,13 +1199,23 @@ ipcMain.handle('start-review', async (_event, request: GenerateReviewRequest): P
   const prData = await getPrMetadata(octokit, owner, repo, pullNumber);
 
   const reviewId = crypto.randomUUID();
+  const prState = prData.merged ? 'merged' : prData.state === 'open' ? 'open' : 'closed';
 
   // Create pending history entry
-  createPendingHistoryEntry(reviewId, prData.title, request.prUrl, prData.author, request.model);
+  createPendingHistoryEntry(
+    reviewId,
+    prData.title,
+    request.prUrl,
+    prData.author,
+    request.model,
+    prState,
+    prData.headSha
+  );
 
   // Track and fire off background generation (no await)
-  activeGenerations.set(reviewId, {});
-  void runBackgroundGeneration(reviewId, request, prData);
+  const abortController = new AbortController();
+  activeGenerations.set(reviewId, { abortController });
+  void runBackgroundGeneration(reviewId, request, prData, abortController.signal);
 
   return {
     reviewId,
@@ -1171,6 +1223,13 @@ ipcMain.handle('start-review', async (_event, request: GenerateReviewRequest): P
     prUrl: request.prUrl,
     author: prData.author,
   };
+});
+
+ipcMain.handle('cancel-review', (_event, reviewId: string) => {
+  const gen = activeGenerations.get(reviewId);
+  if (gen?.abortController) {
+    gen.abortController.abort('User cancelled');
+  }
 });
 
 ipcMain.handle('send-slide-chat', async (_event, req: SendSlideChatRequest) => {
