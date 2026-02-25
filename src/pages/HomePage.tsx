@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   LogOut,
-  CircleCheck,
   Search,
   SlidersHorizontal,
   Play,
@@ -31,6 +30,7 @@ import { FilePickerDialog } from '../../components/FilePickerDialog';
 import { SettingsDialog } from '../../components/SettingsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip';
+import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
 import { riskConfig } from '../../lib/constants';
 import type { ModelId, Preferences, Provider, PrSearchResult, ReviewGuide, ReviewHistoryEntry } from '../../lib/types';
 import { timeAgo, formatDuration, formatBytes, groupReviewsByPR } from '../../lib/utils';
@@ -480,8 +480,17 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
               {/* Account card */}
               <Card>
                 <CardContent className="py-3 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <CircleCheck className="h-3 w-3" />@{(authStatus as { login: string }).login}
+                  <span className="text-xs text-muted-foreground flex items-center gap-2">
+                    <Avatar className="h-5 w-5">
+                      <AvatarImage
+                        src={`https://github.com/${(authStatus as { login: string }).login}.png`}
+                        alt={(authStatus as { login: string }).login}
+                      />
+                      <AvatarFallback className="text-[10px]">
+                        {(authStatus as { login: string }).login.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    @{(authStatus as { login: string }).login}
                   </span>
                   <div className="flex items-center gap-3">
                     <button
