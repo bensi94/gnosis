@@ -114,6 +114,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   detectBinaryPath: (name: string): Promise<string> => ipcRenderer.invoke('detect-binary-path', name),
   checkCliInstalled: (provider: string): Promise<{ installed: boolean; resolvedPath: string }> =>
     ipcRenderer.invoke('check-cli-installed', provider),
+  getPrState: (prUrl: string): Promise<{ prState: 'open' | 'merged' | 'closed'; headSha: string }> =>
+    ipcRenderer.invoke('get-pr-state', prUrl),
   getPrFiles: (prUrl: string): Promise<ChangedFile[]> => ipcRenderer.invoke('get-pr-files', prUrl),
   platform: process.platform,
   isPackaged: process.env.APP_IS_PACKAGED === '1',

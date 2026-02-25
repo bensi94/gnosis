@@ -808,6 +808,18 @@ ipcMain.handle('get-pr-status', async (_event, prUrl: string): Promise<PrStatus>
   };
 });
 
+ipcMain.handle(
+  'get-pr-state',
+  async (_event, prUrl: string): Promise<{ prState: 'open' | 'merged' | 'closed'; headSha: string }> => {
+    const token = getResolvedToken();
+    const octokit = new Octokit({ auth: token ?? undefined });
+    const { owner, repo, pullNumber } = parsePrUrl(prUrl);
+    const prData = await getPrMetadata(octokit, owner, repo, pullNumber);
+    const prState = prData.merged ? 'merged' : prData.state === 'open' ? 'open' : 'closed';
+    return { prState, headSha: prData.headSha };
+  }
+);
+
 ipcMain.handle('get-pr-files', async (_event, prUrl: string): Promise<ChangedFile[]> => {
   const token = getResolvedToken();
   const octokit = new Octokit({ auth: token ?? undefined });

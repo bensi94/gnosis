@@ -147,7 +147,9 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const [generationStartTimes, setGenerationStartTimes] = useState<Map<string, number>>(new Map());
   const [elapsedSeconds, setElapsedSeconds] = useState<Map<string, number>>(new Map());
   const [reviewBytes, setReviewBytes] = useState<Map<string, { inputBytes: number; outputBytes: number }>>(new Map());
-  const [outdatedPrs, setOutdatedPrs] = useState<Set<string>>(new Set());
+  const [livePrStates, setLivePrStates] = useState<
+    Map<string, { prState: 'open' | 'merged' | 'closed'; headSha: string }>
+  >(new Map());
 
   const prGroups = useMemo(() => groupReviewsByPR(history), [history]);
 
@@ -258,19 +260,14 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     return () => clearInterval(id);
   }, [generationStartTimes]);
 
-  // Background-check freshness for open PRs in history
+  // Fetch live PR state for each unique PR URL in history
   useEffect(() => {
     if (prGroups.length === 0) return;
     for (const group of prGroups) {
-      if (group.latestReview.prState !== 'open') continue;
-      const sha = group.latestReview.prHeadSha;
-      if (!sha) continue;
       void window.electronAPI
-        .checkPrFreshness(group.prUrl, sha)
-        .then((result) => {
-          if (result.status !== 'current') {
-            setOutdatedPrs((prev) => new Set(prev).add(group.prUrl));
-          }
+        .getPrState(group.prUrl)
+        .then((live) => {
+          setLivePrStates((prev) => new Map(prev).set(group.prUrl, live));
         })
         .catch(() => {});
     }
@@ -767,8 +764,10 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                       const latestId = group.latestReview.id;
                       const elapsed = elapsedSeconds.get(latestId) ?? 0;
                       const bytes = reviewBytes.get(latestId);
-                      const isOutdated = outdatedPrs.has(group.prUrl);
-                      const prState = group.latestReview.prState;
+                      const liveState = livePrStates.get(group.prUrl);
+                      const prState = liveState?.prState ?? group.latestReview.prState;
+                      const isOutdated =
+                        liveState?.prState === 'open' && liveState.headSha !== group.latestReview.prHeadSha;
 
                       return (
                         <li key={group.prUrl}>
