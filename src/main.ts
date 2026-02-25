@@ -544,6 +544,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   geminiPath: '',
   notifications: true,
   diffLayout: 'unified',
+  includeAllFiles: true,
 };
 
 function applyBinaryOverrides(prefs: Preferences): void {

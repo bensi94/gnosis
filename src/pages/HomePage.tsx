@@ -156,6 +156,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
       setSmartImports(prefs.smartImports);
       setReviewSuggestions(prefs.reviewSuggestions);
       setWebResearch(prefs.enableWebResearch);
+      setIncludeAllFiles(prefs.includeAllFiles);
       setPrefsLoaded(true);
     });
   }, []);
@@ -217,17 +218,39 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
           smartImports,
           reviewSuggestions,
           enableWebResearch: webResearch,
+          includeAllFiles,
           ...overrides,
         });
       });
     },
-    [instructions, provider, model, thinking, signalBoost, smartImports, reviewSuggestions, webResearch]
+    [
+      instructions,
+      provider,
+      model,
+      thinking,
+      signalBoost,
+      smartImports,
+      reviewSuggestions,
+      webResearch,
+      includeAllFiles,
+    ]
   );
 
   // Auto-save when toggles or model/provider change (skip initial load)
   useEffect(() => {
     if (prefsLoaded) savePrefs();
-  }, [prefsLoaded, provider, model, thinking, signalBoost, smartImports, reviewSuggestions, webResearch, savePrefs]);
+  }, [
+    prefsLoaded,
+    provider,
+    model,
+    thinking,
+    signalBoost,
+    smartImports,
+    reviewSuggestions,
+    webResearch,
+    includeAllFiles,
+    savePrefs,
+  ]);
 
   async function handleSignIn() {
     setAuthError(null);
@@ -323,12 +346,8 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
   const isAuthenticated = typeof authStatus === 'object';
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
-      <div className="w-full max-w-6xl flex flex-col gap-8">
-        <div className="text-center hero-glow">
-          <h1 className="text-3xl font-bold tracking-tight font-display relative z-10">Gnosis</h1>
-        </div>
-
+    <main className="h-screen overflow-y-auto p-8">
+      <div className="w-full max-w-6xl mx-auto flex flex-col gap-6">
         {/* Auth section */}
         {authStatus === 'checking' && (
           <div className="flex justify-center">
@@ -651,7 +670,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
 
             {/* History */}
             {prGroups.length > 0 && (
-              <Card className="min-h-0 max-h-[calc(100vh-12rem)] sticky top-8 overflow-hidden flex flex-col bg-card/50">
+              <Card className="min-h-0 max-h-[calc(100vh-6rem)] sticky top-8 overflow-hidden flex flex-col bg-card/50">
                 <div className="px-4 pt-4 pb-2 flex items-center justify-between">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     <History className="h-3 w-3" />
