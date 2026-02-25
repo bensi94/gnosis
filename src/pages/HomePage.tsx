@@ -19,6 +19,7 @@ import {
   GitPullRequest,
   GitPullRequestClosed,
   AlertTriangle,
+  Eraser,
 } from 'lucide-react';
 import { GitHubIcon } from '../../lib/constants';
 import { Button } from '../../components/ui/button';
@@ -406,6 +407,23 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
     setExpandedPRs(new Set());
   }
 
+  async function handleDeleteClosedPRs() {
+    const toDelete = history.filter((entry) => {
+      const live = livePrStates.get(entry.prUrl);
+      const state = live?.prState ?? entry.prState;
+      return state === 'merged' || state === 'closed';
+    });
+    await Promise.all(toDelete.map((entry) => window.electronAPI.deleteReview(entry.id)));
+    const deletedIds = new Set(toDelete.map((e) => e.id));
+    const deletedUrls = new Set(toDelete.map((e) => e.prUrl));
+    setHistory((prev) => prev.filter((e) => !deletedIds.has(e.id)));
+    setExpandedPRs((prev) => {
+      const next = new Set(prev);
+      for (const url of deletedUrls) next.delete(url);
+      return next;
+    });
+  }
+
   function handleProviderChange(p: Provider) {
     setProvider(p);
     setModel(PROVIDERS[p].models[0].id);
@@ -745,13 +763,27 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
                     <History className="h-3 w-3" />
                     Review history
                   </p>
-                  <button
-                    onClick={handleDeleteAllHistory}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                    title="Delete all history"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {prGroups.some((g) => {
+                      const state = livePrStates.get(g.prUrl)?.prState ?? g.latestReview.prState;
+                      return state === 'merged' || state === 'closed';
+                    }) && (
+                      <button
+                        onClick={() => void handleDeleteClosedPRs()}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        title="Remove merged & closed PRs"
+                      >
+                        <Eraser className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={handleDeleteAllHistory}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                      title="Delete all history"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <CardContent className="p-0 flex-1 overflow-y-auto min-h-0">
                   <ul className="divide-y">
