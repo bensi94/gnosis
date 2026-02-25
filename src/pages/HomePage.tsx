@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { GitHubIcon } from '../../lib/constants';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent } from '../../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { PRPickerDialog } from '../../components/PRPickerDialog';
@@ -514,7 +514,10 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
 
               {/* PR form */}
               <Card>
-                <CardContent className="pt-6">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">New Review</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
                   <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
                       <label htmlFor="pr-url" className="text-sm font-medium flex items-center gap-1.5">
