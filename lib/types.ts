@@ -184,6 +184,7 @@ export interface Preferences {
   notifications: boolean;
   diffLayout: 'unified' | 'split';
   includeAllFiles: boolean;
+  reviewSignature: boolean;
 }
 
 export interface SendSlideChatRequest {
