@@ -473,7 +473,7 @@ export function HomePage({ onReviewReady, prefillPrUrl }: Props) {
         {/* Two-column layout: form + history */}
         {isAuthenticated && (
           <div
-            className={`grid gap-6 items-start ${prGroups.length > 0 ? 'grid-cols-[2fr_3fr]' : 'max-w-lg mx-auto w-full'}`}
+            className={`grid gap-6 items-start ${prGroups.length > 0 ? 'grid-cols-[420px_1fr]' : 'max-w-lg mx-auto w-full'}`}
           >
             {/* PR form */}
             <Card>
