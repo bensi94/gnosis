@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startOAuth: (): Promise<void> => ipcRenderer.invoke('start-oauth'),
   getAuthState: (): Promise<{ authenticated: boolean; login: string | null }> => ipcRenderer.invoke('get-auth-state'),
   signOut: (): Promise<void> => ipcRenderer.invoke('sign-out'),
+  savePat: (token: string): Promise<string> => ipcRenderer.invoke('save-pat', token),
   listReviews: (): Promise<ReviewHistoryEntry[]> => ipcRenderer.invoke('list-reviews'),
   loadReview: (id: string): Promise<ReviewGuide> => ipcRenderer.invoke('load-review', id),
   deleteReview: (id: string): Promise<void> => ipcRenderer.invoke('delete-review', id),
