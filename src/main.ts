@@ -369,15 +369,19 @@ function setupAutoUpdater() {
   }
 
   autoUpdater.on('update-downloaded', (_event, _releaseNotes, releaseName) => {
-    const version = releaseName ? ` ${releaseName}` : '';
-    console.log(`[main] Update${version} downloaded, will install on exit`);
+    const version = releaseName.replace(/^v/, '');
+    const label = version ? ` ${version}` : '';
+    console.log(`[main] Update${label} downloaded, will install on exit`);
     if (loadPreferences().notifications) {
       const notif = new Notification({
         title: 'A new update is ready to install',
-        body: `Gnosis${version} has been downloaded and will be automatically installed on exit`,
+        body: `Gnosis${label} has been downloaded and will be automatically installed on exit`,
         silent: true,
       });
       notif.show();
+    }
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('update-ready', version);
     }
   });
 
