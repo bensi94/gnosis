@@ -348,7 +348,7 @@ function createWindow() {
 let dismissedUpdateVersion: string | null = null;
 
 async function runUpdateCheck() {
-  const update = await checkForUpdate(app.getVersion());
+  const update = await checkForUpdate(app.getVersion(), getResolvedToken() ?? undefined);
   if (!update) return;
   if (dismissedUpdateVersion === update.version) return;
 
@@ -753,7 +753,8 @@ ipcMain.handle(
     }
 
     const token = getResolvedToken();
-    const octokit = new Octokit({ auth: token ?? undefined });
+    if (!token) return { status: 'unknown', reason: 'Not signed in' };
+    const octokit = new Octokit({ auth: token });
     const { owner, repo, pullNumber } = parsePrUrl(prUrl);
 
     try {
