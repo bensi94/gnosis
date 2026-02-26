@@ -54,6 +54,8 @@ declare global {
       getPrStatus: (prUrl: string) => Promise<PrStatus>;
       onUpdateAvailable: (callback: (info: UpdateInfo) => void) => void;
       offUpdateAvailable: () => void;
+      onUpdateReady: (callback: (version: string) => void) => void;
+      offUpdateReady: () => void;
       dismissUpdate: (version: string) => Promise<void>;
       openExternal: (url: string) => Promise<void>;
       openLogsDirectory: () => Promise<void>;

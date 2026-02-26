@@ -369,15 +369,19 @@ function setupAutoUpdater() {
   }
 
   autoUpdater.on('update-downloaded', (_event, _releaseNotes, releaseName) => {
-    const version = releaseName ? ` ${releaseName}` : '';
-    console.log(`[main] Update${version} downloaded, will install on exit`);
+    const version = releaseName.replace(/^v/, '');
+    const label = version ? ` ${version}` : '';
+    console.log(`[main] Update${label} downloaded, will install on exit`);
     if (loadPreferences().notifications) {
       const notif = new Notification({
         title: 'A new update is ready to install',
-        body: `Gnosis${version} has been downloaded and will be automatically installed on exit`,
+        body: `Gnosis${label} has been downloaded and will be automatically installed on exit`,
         silent: true,
       });
       notif.show();
+    }
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('update-ready', version);
     }
   });
 
@@ -402,14 +406,14 @@ void app.whenReady().then(() => {
   createWindow();
   setupAutoUpdater();
 
-  // GitHub release polling only needed on platforms without native auto-update (Linux, dev)
-  if (process.platform === 'linux' || !app.isPackaged) {
+  // GitHub release polling only needed on Linux (no native auto-update)
+  if (process.platform === 'linux') {
     startUpdateChecks();
   }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    if (!updateInterval && (process.platform === 'linux' || !app.isPackaged)) startUpdateChecks();
+    if (!updateInterval && process.platform === 'linux') startUpdateChecks();
   });
 });
 
