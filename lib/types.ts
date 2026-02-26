@@ -143,6 +143,7 @@ export interface ReviewHistoryEntry {
   model?: ModelId;
   generationDurationMs?: number;
   savedAt: string; // ISO date string
+  unread?: boolean;
   prState?: 'open' | 'merged' | 'closed';
   prHeadSha?: string;
 }
@@ -177,6 +178,7 @@ export interface Preferences {
   reviewSuggestions: boolean;
   enableTools: boolean;
   enableWebResearch: boolean;
+  autoReviewOnRequest: boolean;
   codeTheme: string;
   codeFont: string;
   claudePath: string;

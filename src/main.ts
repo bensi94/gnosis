@@ -69,17 +69,24 @@ function getPlainTokenPath() {
 }
 
 function loadStoredToken(): string | null {
+  // Avoid calling safeStorage.isEncryptionAvailable() — on macOS it can trigger its
+  // own Keychain prompt before decryptString() does, causing two prompts on startup.
+  // Instead, try decryptString() directly and fall back to plaintext on any error.
   try {
-    if (safeStorage.isEncryptionAvailable() && fs.existsSync(getTokenPath())) {
+    if (fs.existsSync(getTokenPath())) {
       return safeStorage.decryptString(fs.readFileSync(getTokenPath()));
     }
+  } catch {
+    // Encryption unavailable or data corrupted — fall through to plaintext
+  }
+  try {
     if (fs.existsSync(getPlainTokenPath())) {
       return fs.readFileSync(getPlainTokenPath(), 'utf-8').trim();
     }
-    return null;
   } catch {
-    return null;
+    // ignore
   }
+  return null;
 }
 
 function persistToken(token: string) {
@@ -99,7 +106,9 @@ function deleteStoredToken() {
 
 function getResolvedToken(): string | null {
   if (cachedToken) return cachedToken;
-  return loadStoredToken();
+  const token = loadStoredToken();
+  if (token) cachedToken = token; // cache so keychain is only unlocked once per session
+  return token;
 }
 
 // ── OAuth flow ──────────────────────────────────────────────────
@@ -365,6 +374,117 @@ function startUpdateChecks() {
   updateInterval = setInterval(() => void runUpdateCheck(), 4 * 60 * 60 * 1_000);
 }
 
+// ── Auto-review on reviewer assignment ──────────────────────────
+
+const AUTO_REVIEW_POLL_INTERVAL_MS = 5 * 60 * 1_000; // 5 minutes
+const AUTO_REVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1_000; // ignore PRs not updated within 24 h
+
+function getSeenReviewRequestsPath() {
+  return path.join(app.getPath('userData'), 'seen-review-requests.json');
+}
+
+function loadSeenReviewRequests(): Set<string> {
+  try {
+    const data = JSON.parse(fs.readFileSync(getSeenReviewRequestsPath(), 'utf-8')) as string[];
+    return new Set(data);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSeenReviewRequests(seen: Set<string>) {
+  fs.writeFileSync(getSeenReviewRequestsPath(), JSON.stringify([...seen], null, 2));
+}
+
+// Loaded once into memory; updated as reviews are triggered
+let seenReviewRequests = new Set<string>();
+
+async function triggerBackgroundReview(prUrl: string, prefs: Preferences): Promise<void> {
+  // cachedToken is guaranteed non-null by the caller (runAutoReviewCheck).
+  console.log(`[auto-review] Starting background review for ${prUrl}`);
+  const reviewId = crypto.randomUUID();
+
+  try {
+    const octokit = new Octokit({ auth: cachedToken ?? undefined });
+    const { owner, repo, pullNumber } = parsePrUrl(prUrl);
+    const prData = await getPrMetadata(octokit, owner, repo, pullNumber);
+
+    const abortController = new AbortController();
+    createPendingHistoryEntry(reviewId, prData.title, prUrl, prData.author, prefs.model, 'open', prData.headSha, true);
+    activeGenerations.set(reviewId, { abortController });
+
+    const request: GenerateReviewRequest = {
+      prUrl,
+      provider: prefs.provider,
+      model: prefs.model,
+      instructions: prefs.instructions,
+      thinking: prefs.thinking,
+      signalBoost: prefs.signalBoost,
+      smartImports: prefs.smartImports,
+      reviewSuggestions: prefs.reviewSuggestions,
+    };
+
+    await runBackgroundGeneration(reviewId, request, prData, abortController.signal);
+
+    // Refresh the history list in all open windows
+    broadcastToAllWindows('new-review-in-history');
+    console.log(`[auto-review] Completed review for ${prUrl}`);
+  } catch (err) {
+    console.error(`[auto-review] Failed to start background review for ${prUrl}:`, err);
+  }
+}
+
+async function runAutoReviewCheck() {
+  // Use only in-memory state — never touch the keychain from a background timer.
+  // cachedToken and cachedLogin are populated when the user authenticates via IPC.
+  if (!cachedToken || !cachedLogin) return;
+  const prefs = loadPreferences();
+  if (!prefs.autoReviewOnRequest) return;
+
+  try {
+    const octokit = new Octokit({ auth: cachedToken });
+    const prs = await searchPullRequests(octokit, cachedLogin);
+    // searchPullRequests already queries `is:open`, so merged/closed PRs are excluded
+    const reviewRequested = prs.filter((pr) => pr.role === 'review-requested');
+    const now = Date.now();
+
+    for (const pr of reviewRequested) {
+      if (!seenReviewRequests.has(pr.url)) {
+        // Always mark as seen so we never trigger the same PR twice
+        seenReviewRequests.add(pr.url);
+        saveSeenReviewRequests(seenReviewRequests);
+
+        // Only review PRs updated in the last 24 h — avoids flooding on first enable
+        const updatedAt = new Date(pr.updatedAt).getTime();
+        if (now - updatedAt <= AUTO_REVIEW_MAX_AGE_MS) {
+          void triggerBackgroundReview(pr.url, prefs);
+        } else {
+          console.log(`[auto-review] Skipping stale PR (${Math.round((now - updatedAt) / 3_600_000)}h old): ${pr.url}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[auto-review] Poll check failed:', err);
+  }
+}
+
+let autoReviewInterval: ReturnType<typeof setInterval> | null = null;
+
+function startAutoReviewPolling() {
+  if (autoReviewInterval) return;
+  seenReviewRequests = loadSeenReviewRequests();
+  // Initial check after 10 seconds to let the app fully initialize
+  setTimeout(() => void runAutoReviewCheck(), 10_000);
+  autoReviewInterval = setInterval(() => void runAutoReviewCheck(), AUTO_REVIEW_POLL_INTERVAL_MS);
+}
+
+function stopAutoReviewPolling() {
+  if (autoReviewInterval) {
+    clearInterval(autoReviewInterval);
+    autoReviewInterval = null;
+  }
+}
+
 // ── Auto-updater (Squirrel) ─────────────────────────────────────
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
@@ -421,9 +541,12 @@ void app.whenReady().then(() => {
     startUpdateChecks();
   }
 
+  startAutoReviewPolling();
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
     if (!updateInterval && process.platform === 'linux') startUpdateChecks();
+    if (!autoReviewInterval) startAutoReviewPolling();
   });
 });
 
@@ -458,6 +581,7 @@ app.on('window-all-closed', () => {
     clearInterval(updateInterval);
     updateInterval = null;
   }
+  stopAutoReviewPolling();
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -497,7 +621,8 @@ function createPendingHistoryEntry(
   author: string,
   model?: ModelId,
   prState?: 'open' | 'merged' | 'closed',
-  prHeadSha?: string
+  prHeadSha?: string,
+  unread?: boolean
 ): void {
   ensureReviewsDir();
   const entry: ReviewHistoryEntry = {
@@ -511,6 +636,7 @@ function createPendingHistoryEntry(
     savedAt: new Date().toISOString(),
     prState,
     prHeadSha,
+    ...(unread ? { unread: true } : {}),
   };
   const index = readReviewsIndex();
   index.unshift(entry);
@@ -562,6 +688,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   reviewSuggestions: true,
   enableTools: false,
   enableWebResearch: false,
+  autoReviewOnRequest: false,
   codeTheme: 'aurora-x',
   codeFont: 'jetbrains-mono',
   claudePath: '',
@@ -694,6 +821,9 @@ ipcMain.handle('load-preferences', () => {
 ipcMain.handle('save-preferences', (_event, prefs: Preferences) => {
   savePreferences(prefs);
   applyBinaryOverrides(prefs);
+  // Restart polling so the new autoReviewOnRequest value takes effect immediately
+  stopAutoReviewPolling();
+  if (prefs.autoReviewOnRequest) startAutoReviewPolling();
 });
 
 ipcMain.handle('detect-binary-path', (_event, name: string) => {
@@ -724,6 +854,11 @@ ipcMain.handle('re-render-hunks', async (_event, review: ReviewGuide) => {
   const prefs = loadPreferences();
   await reRenderAllHunks(review, prefs.codeTheme);
   return review;
+});
+
+ipcMain.handle('mark-review-read', (_event, id: string) => {
+  const index = readReviewsIndex().map((e) => (e.id === id ? { ...e, unread: false } : e));
+  fs.writeFileSync(getReviewsIndexPath(), JSON.stringify(index, null, 2));
 });
 
 ipcMain.handle('delete-review', (_event, id: string) => {

@@ -16,6 +16,9 @@ export function App() {
       if (prefs.codeFont) applyCodeFont(prefs.codeFont);
     });
   }, []);
+
+  // When a background auto-review completes, the history list will refresh itself
+  // via the new-review-in-history event — handled in HomePage.
   const [review, setReview] = useState<ReviewGuide | null>(null);
   const [prefillPrUrl, setPrefillPrUrl] = useState<string | undefined>();
 

@@ -63,6 +63,9 @@ declare global {
       openReviewPrompt: (id: string) => Promise<void>;
       detectBinaryPath: (name: string) => Promise<string>;
       checkCliInstalled: (provider: string) => Promise<{ installed: boolean; resolvedPath: string }>;
+      onNewReviewInHistory: (callback: () => void) => void;
+      offNewReviewInHistory: () => void;
+      markReviewRead: (id: string) => Promise<void>;
       getPrState: (prUrl: string) => Promise<{ prState: 'open' | 'merged' | 'closed'; headSha: string }>;
       getPrFiles: (prUrl: string) => Promise<ChangedFile[]>;
       platform: NodeJS.Platform;
