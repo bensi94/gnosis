@@ -125,9 +125,15 @@ export interface StreamingCliOptions {
  * Spawn a CLI process with streaming stdout line-buffering, debug logging,
  * and ENOENT handling. Used by both Claude and Gemini providers.
  */
+function withBinDir(binPath: string, env: NodeJS.ProcessEnv | undefined): NodeJS.ProcessEnv {
+  const binDir = path.dirname(binPath);
+  const existing = env?.PATH ?? process.env.PATH ?? '';
+  return { ...env, PATH: `${binDir}${path.delimiter}${existing}` };
+}
+
 export function spawnCliStreaming(opts: StreamingCliOptions): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(opts.binPath, opts.args, { env: opts.env });
+    const proc = spawn(opts.binPath, opts.args, { env: withBinDir(opts.binPath, opts.env) });
     const tag = `[${opts.cliName}]`;
 
     if (opts.signal) {
@@ -211,7 +217,7 @@ export interface QuickCliOptions {
  */
 export function spawnCliQuick(opts: QuickCliOptions): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(opts.binPath, opts.args, { env: opts.env });
+    const proc = spawn(opts.binPath, opts.args, { env: withBinDir(opts.binPath, opts.env) });
 
     proc.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'ENOENT') {
